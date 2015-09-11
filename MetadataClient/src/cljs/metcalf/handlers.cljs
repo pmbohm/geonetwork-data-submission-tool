@@ -195,6 +195,21 @@
 (defn attach-success! [new-attachment]
   (swap! app-state update-in [:attachments] conj new-attachment))
 
+(defn delete-attachment!
+  "Quick and dirty delete function"
+  [attachments-ref {:keys [delete_url] :as attachment}]
+  (if (js/confirm "Are you sure you want to delete this file?")
+    (let []
+      (DELETE delete_url {:handler         (fn [{:keys [message document] :as data}]
+                                             (let [pred #(= % attachment)]
+                                               (om/transact! attachments-ref #(vec (remove pred %)))))
+                          :error-handler   (fn [{:keys [status failure response status-text] :as data}]
+                                             (js/alert "Unable to delete file"))
+                          :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
+                          :format          :json
+                          :response-format :json
+                          :keywords?       true}))))
+
 (defn field-blur! [cursor]
   (om/update! cursor :show-errors true))
 

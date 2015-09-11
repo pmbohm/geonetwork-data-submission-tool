@@ -83,22 +83,6 @@
              [:input.hidden
               {:ref "input" :type "file" :name (:name props)}]]))))
 
-
-(defn delete-attachment!
-  "Quick and dirty delete function"
-  [attachments-ref {:keys [delete_url] :as attachment}]
-  (if (js/confirm "Are you sure you want to delete this file?")
-    (let []
-      (DELETE delete_url {:handler         (fn [{:keys [message document] :as data}]
-                                             (let [pred #(= % attachment)]
-                                               (om/transact! attachments-ref #(vec (remove pred %)))))
-                          :error-handler   (fn [{:keys [status failure response status-text] :as data}]
-                                             (js/alert "Unable to delete file"))
-                          :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
-                          :format          :json
-                          :response-format :json
-                          :keywords?       true}))))
-
 (defn UploadData [_ owner]
   (reify
     om/IDisplayName (display-name [_] "UploadData")
@@ -123,7 +107,7 @@
                         [:a {:href (:file a) :target "blank"} (:name a)]
 
                         [:button.btn.btn-warn.btn-xs.pull-right
-                         {:on-click #(delete-attachment! attachments a)}
+                         {:on-click #(handlers/delete-attachment! attachments a)}
                          [:span.glyphicon.glyphicon-minus]]]])]]]
                  [:p "There are no data files attached to this record"])
                [:form#upload-form
