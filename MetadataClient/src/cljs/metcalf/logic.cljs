@@ -5,15 +5,47 @@
     [condense.fields :refer [validate-required-field]]
     [condense.utils :refer [keys-in int-assoc-in fmap]]
     [metcalf.progress :refer [progress-score]]
-    [tailrecursion.priority-map :refer [priority-map]]
     [om-tick.field :refer [tree-edit field-edit field-zipper field?]]
     [clojure.string :as string]))
 
 (defn theme-option [[uuid & tokens]]
   [uuid (string/join " | " (take-while (complement empty?) tokens))])
 
-(defn init-theme-options [{:keys [table] :as theme}]
-  (assoc theme :options (into (priority-map) (map theme-option table))))
+(defn path-values
+  [data]
+  (let [get-value #(get-in data %)
+        get-path #(mapcat concat (partition-by number? %) (repeat [:value]))]
+    (map (juxt get-path get-value)
+         (keys-in data))))
+
+
+(defn reduce-field-values [fields values]
+  (reduce (fn [m [p v]]
+            (try (int-assoc-in m p v)
+                 (catch :default e
+                   (js/console.error (clj->js [m p v]) e)
+                   m)))
+          fields (path-values values)))
+
+
+(defn path-fields [data]
+  (into (sorted-set)
+    (keep (fn [path]
+            (let [[parent [i k]] (split-with (complement integer?) path)]
+              (when k
+                (let [parent (vec parent)]
+                  [(conj parent :fields k)
+                   (conj parent :value i :value k)]))))
+          (keys-in data))))
+
+(defn reduce-many-field-templates
+  "For each many field value "
+  [fields values]
+  (reduce (fn [m [tpl-path value-path]]
+            (try
+              (int-assoc-in m value-path (get-in fields tpl-path))
+              (catch js/Error e m)))
+          fields (path-fields values)))
 
 (defn field-walk
   "Tweaked walker which treats fields/branches in a specific way"

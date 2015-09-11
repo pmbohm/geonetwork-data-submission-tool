@@ -21,7 +21,7 @@
             [condense.autocomplete :refer [AutoComplete]]
             [openlayers-om-components.geographic-element :refer [BoxMap]]
             [metcalf.logic :as logic :refer [extract-field-values]]
-            [metcalf.content :refer [default-payload contact-groups]]
+            [metcalf.content :refer [contact-groups]]
 
             [condense.utils :refer [fmap title-case keys-in
                                     int-assoc-in map-keys vec-remove enum]]
@@ -42,67 +42,15 @@
             goog.net.IframeIo
             select-om-all.core
             select-om-all.utils
-            [metcalf.utils :refer [deep-merge]]
             [metcalf.routing :as router]
             [metcalf.views.page :refer [PageView PageTabView]]
-            [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]))
+            [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]
+            [metcalf.handlers :as handlers]))
 
 
 
 (defn ^:export app-state-js []
   (clj->js @app-state))
-
-
-(defn path-values
-  [data]
-  (let [get-value #(get-in data %)
-        get-path #(mapcat concat (partition-by number? %) (repeat [:value]))]
-    (map (juxt get-path get-value)
-         (keys-in data))))
-
-
-(defn reduce-field-values [fields values]
-  (reduce (fn [m [p v]]
-            (try (int-assoc-in m p v)
-                 (catch :default e
-                   (js/console.error (clj->js [m p v]) e)
-                   m)))
-          fields (path-values values)))
-
-(defn path-fields [data]
-  (into (sorted-set)
-    (keep (fn [path]
-            (let [[parent [i k]] (split-with (complement integer?) path)]
-              (when k
-                (let [parent (vec parent)]
-                  [(conj parent :fields k)
-                   (conj parent :value i :value k)]))))
-          (keys-in data))))
-
-(defn reduce-many-field-templates
-  "For each many field value "
-  [fields values]
-  (reduce (fn [m [tpl-path value-path]]
-            (try
-              (int-assoc-in m value-path (get-in fields tpl-path))
-              (catch js/Error e m)))
-          fields (path-fields values)))
-
-(defn initialise-form
-  ([{:keys [data] :as form}]
-   (initialise-form form data))
-  ([form data]
-   (-> (reset-form form)
-       (assoc :data data)
-       (update :fields reduce-many-field-templates data)
-       (update :fields reduce-field-values data))))
-
-(defn initial-state
-  "Massage raw payload for use as app-state"
-  [payload]
-  (-> (deep-merge default-payload payload)
-      (update :form initialise-form)
-      (update :theme logic/init-theme-options)))
 
 (defn field-update! [owner field v]
   (om/update! field :value v)
@@ -2017,7 +1965,7 @@
     (condense.watch-state/enable-state-change-reporting app-state)
     ;(condense.performance/enable-performance-reporting)
     (when (-> @app-state :page :name nil?)
-      (reset! app-state (initial-state (js->clj (aget js/window "payload") :keywordize-keys true)))
+      (reset! app-state (handlers/initial-state (js->clj (aget js/window "payload") :keywordize-keys true)))
       (router/start! {:iref app-state
                       :path [:page :tab]
                       :->hash (fnil name "")
