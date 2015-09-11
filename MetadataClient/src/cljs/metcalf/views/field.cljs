@@ -1,4 +1,4 @@
-(ns metcalf.views.form
+(ns metcalf.views.field
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [cljs.core.async :as async :refer [<! timeout]]
             [om.core :as om :include-macros true]

@@ -14,7 +14,7 @@
             [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
                                           TextareaField TextareaFieldProps CheckboxField
                                           handle-checkbox-change]]
-            [metcalf.views.form :refer [TableInlineEdit DataParametersTable Lodge AddressField
+            [metcalf.views.field :refer [TableInlineEdit DataParametersTable Lodge AddressField
                                         OrganisationInputField ResponsiblePartyField FieldError
                                         PageErrors CreditField ResourceConstraints SupplementalInformation
                                         DashboardCreateModal NewDocumentButton]]
