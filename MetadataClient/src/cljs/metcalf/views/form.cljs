@@ -178,10 +178,10 @@
       (let [{:keys [city postalCode administrativeArea country deliveryPoint deliveryPoint2]} address]
         (html [:div.AddressField
                (om/build Input (assoc deliveryPoint
-                                 :on-blur #(om/update! deliveryPoint :show-errors true)
+                                 :on-blur #(handlers/field-blur! deliveryPoint)
                                  :on-change #(handle-value-change owner deliveryPoint %)))
                (om/build Input (assoc deliveryPoint2
-                                 :on-blur #(om/update! deliveryPoint2 :show-errors true)
+                                 :on-blur #(handlers/field-blur! deliveryPoint2)
                                  :on-change #(handle-value-change owner deliveryPoint2 %)))
                [:div.row
                 [:div.col-xs-6

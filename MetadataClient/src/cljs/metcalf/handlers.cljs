@@ -193,3 +193,10 @@
 
 (defn attach-success! [new-attachment]
   (swap! app-state update-in [:attachments] conj new-attachment))
+
+(defn field-blur! [cursor]
+  (om/update! cursor :show-errors true))
+
+(defn field-update! [owner field v]
+  (om/update! field :value v)
+  (put! (:pub-chan (om/get-shared owner)) {:topic (om/path field) :value v}))

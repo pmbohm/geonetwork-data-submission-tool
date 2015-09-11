@@ -8,17 +8,14 @@
                                      help-block-template label-template
                                      del-value! add-value! add-field!]]
             [om-tick.bootstrap :refer [Select Date validation-state]]
-            [condense.autocomplete :refer [AutoComplete]]))
-
-(defn field-update! [owner field v]
-  (om/update! field :value v)
-  (put! (:pub-chan (om/get-shared owner)) {:topic (om/path field) :value v}))
+            [condense.autocomplete :refer [AutoComplete]]
+            [metcalf.handlers :as handlers]))
 
 (defn handle-value-change [owner field event]
-  (field-update! owner field (-> event .-target .-value)))
+  (handlers/field-update! owner field (-> event .-target .-value)))
 
 (defn handle-checkbox-change [owner field event]
-  (field-update! owner field (-> event .-target .-checked)))
+  (handlers/field-update! owner field (-> event .-target .-checked)))
 
 (defn InputField [props owner]
   (reify
