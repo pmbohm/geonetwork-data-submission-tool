@@ -7,7 +7,8 @@
             [metcalf.routing :as router]
             [metcalf.views.page :refer [PageView]]
             [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]
-            [metcalf.handlers :as handlers]))
+            [metcalf.handlers :as handlers]
+            goog.userAgent))
 
 (defn LegacyIECompatibility [props owner]
   (reify
