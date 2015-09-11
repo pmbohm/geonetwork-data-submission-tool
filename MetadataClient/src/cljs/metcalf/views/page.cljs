@@ -437,7 +437,7 @@
                 [:div.list-group
                  (om/build-all DocumentTeaser filtered-docs)
                  (if (empty? documents)
-                   [:a.list-group-item {:on-click #(do (show-create-modal!)
+                   [:a.list-group-item {:on-click #(do (handlers/show-create-modal!)
                                                        (.preventDefault %))
                                         :href (:Create urls)}
                     [:span.glyphicon.glyphicon-star.pull-right]

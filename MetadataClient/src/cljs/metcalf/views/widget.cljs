@@ -23,7 +23,7 @@
         (om/build Input (-> field
                             (merge (dissoc props :path))
                             (assoc
-                              :on-blur #(om/update! field :show-errors true)
+                              :on-blur #(handlers/show-errors! field)
                               :on-change #(handlers/value-change! owner field %))))))))
 
 (defn DecimalField [path owner]
@@ -34,7 +34,7 @@
       (let [field (observe-path owner path)]
         (om/build Input (assoc field
                           :class "wauto"
-                          :on-blur #(om/update! field :show-errors true)
+                          :on-blur #(handlers/show-errors! field)
                           :on-change #(handlers/value-change! owner field %)))))))
 
 (defn DateField [path owner]
@@ -45,8 +45,8 @@
       (let [field (observe-path owner path)]
         (om/build Date (assoc field :class "wauto"
                                     :display-format "DD-MM-YYYY"
-                                    :on-blur #(om/update! field :show-errors true)
-                                    :on-date-change #(om/update! field :value %)))))))
+                                    :on-blur #(handlers/show-errors! field)
+                                    :on-date-change #(handlers/field-update! owner field %)))))))
 
 (defn SelectField [path owner]
   (reify
@@ -58,7 +58,7 @@
                            :class "wauto"
                            :disabled (or disabled (empty? options))
                            :default-option (if-not (empty? options) default-option "")
-                           :on-blur #(om/update! field :show-errors true)
+                           :on-blur #(handlers/show-errors! field)
                            :on-change #(handlers/value-change! owner field %)))))))
 
 (defn AutoCompleteField [path owner]
@@ -81,7 +81,7 @@
             field (observe-path owner path)]
         (om/build ExpandingTextarea (merge field (dissoc props :path)
                                            {:on-change #(handlers/value-change! owner field %)
-                                            :on-blur #(om/update! field :show-errors true)}))))))
+                                            :on-blur #(handlers/show-errors! field)}))))))
 
 (defn TextareaField [path owner]
   (reify
@@ -90,7 +90,7 @@
     (render-state [_ {:keys []}]
       (let [field (observe-path owner path)]
         (om/build ExpandingTextarea (assoc field
-                                      :on-blur #(om/update! field :show-errors true)
+                                      :on-blur #(handlers/show-errors! field)
                                       :on-change #(handlers/value-change! owner field %)))))))
 
 (defn CheckboxField [path owner]
@@ -100,6 +100,6 @@
     (render-state [_ {:keys []}]
       (let [field (observe-path owner path)]
         (om/build Checkbox (assoc field :checked (:value field)
-                                        :on-blur #(om/update! field :show-errors true)
+                                        :on-blur #(handlers/show-errors! field)
                                         :on-change #(handle-checkbox-change owner field %)))))))
 

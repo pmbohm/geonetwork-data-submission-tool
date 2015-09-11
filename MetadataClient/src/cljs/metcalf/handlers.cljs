@@ -207,8 +207,8 @@
 (defn hide-errors! [form]
   (om/update! form :show-errors false))
 
-(defn show-errors! [form]
-  (om/update! form :show-errors true))
+(defn show-errors! [form-or-field]
+  (om/update! form-or-field :show-errors true))
 
 (defn hide-create-modal! []
   (om/update! (ref-path [:page]) :show-create-modal false))
