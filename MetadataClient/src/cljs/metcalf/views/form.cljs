@@ -390,8 +390,7 @@
     om/IDisplayName (display-name [_] "DashboardCreateModal")
     om/IRender
     (render [_]
-      (let [page (observe-path owner [:page])
-            hide-modal! #(om/update! page :show-create-modal false)]
+      (let [hide-modal! #(handlers/hide-create-modal!)]
         (html [:div.DashboardCreateModal
                (om/build Modal {:ok-copy      "OK"
                                 :modal-header (html [:span [:span.glyphicon.glyphicon-list] " " "Create a new record"])
@@ -406,7 +405,6 @@
     om/IInitState (init-state [_] {:title ""})
     om/IRenderState
     (render-state [_ {:keys [title ch]}]
-      (html [:button.btn.btn-primary {:on-click #(om/update! (ref-path [:page])
-                                                             :show-create-modal true)}
+      (html [:button.btn.btn-primary {:on-click #(handlers/show-create-modal!)}
              [:span.glyphicon.glyphicon-plus]
              " Create new record"]))))

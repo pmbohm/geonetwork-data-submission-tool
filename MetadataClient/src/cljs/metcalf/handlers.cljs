@@ -206,3 +206,9 @@
 
 (defn hide-errors! [form]
   (om/update! form :show-errors false))
+
+(defn hide-create-modal! []
+  (om/update! (ref-path [:page]) :show-create-modal false))
+
+(defn show-create-modal! []
+  (om/update! (ref-path [:page]) :show-create-modal true))
