@@ -1,6 +1,6 @@
 (ns metcalf.core
   (:require-macros [cljs.core.async.macros :refer [go alt! go-loop]])
-  (:require [cljs.core.async :as async :refer [put! <! alts! chan pub sub timeout dropping-buffer]]
+  (:require [cljs.core.async :as async :refer [put! <! alts! chan sub timeout dropping-buffer]]
             [clojure.string :refer [blank?]]
             [clojure.set :as set]
             [om.core :as om :include-macros true]
@@ -20,10 +20,10 @@
             [om-tick.bootstrap :refer [Select Date validation-state]]
             [condense.autocomplete :refer [AutoComplete]]
             [openlayers-om-components.geographic-element :refer [BoxMap]]
-            [metcalf.logic :refer [derived-state extract-field-values]]
+            [metcalf.logic :refer [extract-field-values]]
             [metcalf.content :refer [default-payload contact-groups]]
-            [condense.derived :refer [derived-atom!]]
-            [condense.utils :refer [fmap memoize-last title-case keys-in
+
+            [condense.utils :refer [fmap title-case keys-in
                                     int-assoc-in map-keys vec-remove enum]]
             cljsjs.moment
             cljsjs.fixed-data-table
@@ -43,12 +43,11 @@
             goog.net.IframeIo
             select-om-all.core
             select-om-all.utils
-            [metcalf.routing :as router]))
+            [metcalf.routing :as router]
+            [metcalf.views.page :refer [PageView PageTabView]]
+            [metcalf.globals :refer [app-state pub-chan notif-chan]]))
 
 
-(defonce app-state (derived-atom! (atom {}) (memoize-last derived-state)))
-(def pub-chan (chan))
-(def notif-chan (pub pub-chan :topic))
 
 (defn ^:export app-state-js []
   (clj->js @app-state))
@@ -256,7 +255,6 @@
                         [:span.glyphicon.glyphicon-chevron-left] " Back"]))))))
 
 
-(defmulti PageView (fn [page owner] (get page :name)) :default "404")
 
 
 (def Table (js/React.createFactory js/FixedDataTable.Table))
@@ -1378,9 +1376,6 @@
                            :title "Logout"} [:span.glyphicon.glyphicon-log-out]
                        " Sign out"]]]]])))))
 
-
-(defmulti PageTabView (fn [page owner] [(get page :name)
-                                        (get page :tab :data-identification)]))
 
 (defmethod PageView "404"
   [page owner]
