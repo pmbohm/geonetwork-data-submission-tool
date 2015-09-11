@@ -21,3 +21,6 @@
   [owner path]
   {:pre [(om/component? owner)]}
   (om/observe owner (ref-path path)))
+
+(defn ^:export app-state-js []
+  (clj->js @app-state))

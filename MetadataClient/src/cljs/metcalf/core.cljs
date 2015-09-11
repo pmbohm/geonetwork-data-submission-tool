@@ -17,8 +17,7 @@
             [om-tick.form :refer [is-valid? load-errors reset-form extract-data]]
             [om-tick.field :refer [field-zipper field-edit reset-field field?]]
             [clojure.zip :as zip :refer [zipper]]
-            [om-tick.bootstrap :refer [Select Date validation-state]]
-            [condense.autocomplete :refer [AutoComplete]]
+            [om-tick.bootstrap :refer [Select validation-state]]
             [openlayers-om-components.geographic-element :refer [BoxMap]]
             [metcalf.logic :as logic :refer [extract-field-values]]
             [metcalf.content :refer [contact-groups]]
@@ -26,7 +25,7 @@
             [condense.utils :refer [fmap title-case keys-in
                                     int-assoc-in map-keys vec-remove enum]]
             cljsjs.moment
-            cljsjs.fixed-data-table
+
             condense.watch-state
             condense.performance
             [condense.history :as history]
@@ -43,235 +42,23 @@
             select-om-all.core
             select-om-all.utils
             [metcalf.routing :as router]
-            [metcalf.views.page :refer [PageView PageTabView]]
+            [metcalf.views.page :refer [PageView PageTabView BackButton]]
             [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]
-            [metcalf.handlers :as handlers]))
-
-
-
-(defn ^:export app-state-js []
-  (clj->js @app-state))
-
-(defn field-update! [owner field v]
-  (om/update! field :value v)
-  (put! (:pub-chan (om/get-shared owner)) {:topic (om/path field) :value v}))
-
-(defn handle-value-change [owner field event]
-  (field-update! owner field (-> event .-target .-value)))
-
-(defn handle-checkbox-change [owner field event]
-  (field-update! owner field (-> event .-target .-checked)))
-
-;;;;;;;;;
-(defn InputField [props owner]
-  (reify
-    om/IDisplayName (display-name [_] "InputField")
-    om/IRenderState
-    (render-state [_ {:keys []}]
-      (let [field (observe-path owner (:path props))]
-        (om/build Input (-> field
-                            (merge (dissoc props :path))
-                            (assoc
-                              :on-blur #(om/update! field :show-errors true)
-                              :on-change #(handle-value-change owner field %))))))))
-
-(defn DecimalField [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "DecimalField")
-    om/IRenderState
-    (render-state [_ {:keys []}]
-      (let [field (observe-path owner path)]
-        (om/build Input (assoc field
-                          :class "wauto"
-                          :on-blur #(om/update! field :show-errors true)
-                          :on-change #(handle-value-change owner field %)))))))
-
-(defn DateField [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "DateField")
-    om/IRender
-    (render [_]
-      (let [field (observe-path owner path)]
-        (om/build Date (assoc field :class "wauto"
-                                    :display-format "DD-MM-YYYY"
-                                    :on-blur #(om/update! field :show-errors true)
-                                    :on-date-change #(om/update! field :value %)))))))
-
-(defn SelectField [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "SelectField")
-    om/IRender
-    (render [_]
-      (let [{:keys [options default-option disabled] :as field} (observe-path owner path)]
-        (om/build Select (assoc field
-                           :class "wauto"
-                           :disabled (or disabled (empty? options))
-                           :default-option (if-not (empty? options) default-option "")
-                           :on-blur #(om/update! field :show-errors true)
-                           :on-change #(handle-value-change owner field %)))))))
-
-(defn AutoCompleteField [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "AutoCompleteField")
-    om/IRenderState
-    (render-state [_ {:keys []}]
-      (let [{:keys [options default-option disabled] :as field} (observe-path owner path)]
-        (om/build AutoComplete (assoc field
-                                 :disabled (or disabled (empty? options))
-                                 :default-option (if-not (empty? options) default-option "")
-                                 :on-change #(handle-value-change owner field %)))))))
-
-(defn TextareaFieldProps [props owner]
-  (reify
-    om/IDisplayName (display-name [_] "TextareaField")
-    om/IRenderState
-    (render-state [_ {:keys []}]
-      (let [{:keys [path]} props
-            field (observe-path owner path)]
-        (om/build ExpandingTextarea (merge field (dissoc props :path)
-                                           {:on-change #(handle-value-change owner field %)
-                                            :on-blur #(om/update! field :show-errors true)}))))))
-
-(defn TextareaField [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "TextareaField")
-    om/IRenderState
-    (render-state [_ {:keys []}]
-      (let [field (observe-path owner path)]
-        (om/build ExpandingTextarea (assoc field
-                                      :on-blur #(om/update! field :show-errors true)
-                                      :on-change #(handle-value-change owner field %)))))))
-
-
-(defn CheckboxField [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "CheckboxField")
-    om/IRenderState
-    (render-state [_ {:keys []}]
-      (let [field (observe-path owner path)]
-        (om/build Checkbox (assoc field :checked (:value field)
-                                        :on-blur #(om/update! field :show-errors true)
-                                        :on-change #(handle-checkbox-change owner field %)))))))
-
-;;;;;;;;;
-(defn goto-page [page-state new-page]
-  (assoc new-page :back (om/value page-state)))
-
-(defn goto-page!
-  ([page-name]
-   (.scrollIntoView (goog.dom.getElementByClass "container"))
-   (swap! app-state update-in [:page] goto-page {:name page-name}))
-  ([page-name page-attrs]
-   (.scrollIntoView (goog.dom.getElementByClass "container"))
-   (swap! app-state update-in [:page] goto-page (assoc page-attrs :name page-name))))
-
-(defn BackButton [props owner]
-  (reify
-    om/IDisplayName (display-name [_] "BackButton")
-    om/IRender
-    (render [_]
-      (let [page (observe-path owner [:page])
-            back (:back page)]
-        (html (if back [:button.btn.btn-default.BackButton
-                        {:on-click #(swap! app-state assoc :page (into {} back))}
-                        [:span.glyphicon.glyphicon-chevron-left] " Back"]))))))
+            [metcalf.handlers :as handlers]
+            [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
+                                          TextareaField TextareaFieldProps CheckboxField
+                                          handle-value-change field-update! handle-checkbox-change]]
+            [metcalf.views.table :refer [Table Column ColumnGroup getter
+                                         KeywordsThemeCell KeywordsThemeTable]]))
 
 
 
 
-(def Table (js/React.createFactory js/FixedDataTable.Table))
-(def Column (js/React.createFactory js/FixedDataTable.Column))
-(def ColumnGroup (js/React.createFactory js/FixedDataTable.ColumnGroup))
-
-(defn getter [k row] (get row k))
-
-(defn update-table-width [owner]
-  (let [autowidth (om/get-node owner "autowidth")
-        width (.-width (goog.style.getSize autowidth))]
-    (om/set-state! owner :width width)))
 
 
-(defn KeywordsThemeCell [rowData owner]
-  (reify
-    om/IDisplayName (display-name [_] "KeywordThemeCell")
-    om/IRender
-    (render [_]
-      (let [rowData (take-while (complement empty?) rowData)]
-        (html [:div.topic-cell
-               [:div.topic-path (string/join " > " (drop-last (rest rowData)))]
-               [:div.topic-value (last rowData)]])))))
 
 
-(defn KeywordsThemeTable [props owner]
-  (reify
-    om/IDisplayName (display-name [_] "TestThemeTable")
-    om/IInitState (init-state [_]
-                    {:columnWidths     [26 (- 900 26)]
-                     :isColumnResizing false
-                     :query            ""
-                     ;:selected-filter  false
-                     :width            900
-                     :scrollToRow      0})
-    om/IDidMount
-    (did-mount [_]
-      (let [vsm (goog.dom.ViewportSizeMonitor.)]
-        (goog.events.listen vsm goog.events.EventType.RESIZE #(update-table-width owner))
-        (update-table-width owner)))
-    om/IRenderState
-    (render-state [_ {:keys [query width columnWidths isColumnResizing scrollToRow]}]
-      (let [keywords (observe-path owner [:form :fields :identificationInfo :keywordsTheme :keywords])
-            uuids (zipmap (map :value (:value keywords)) (range))
-            table (observe-path owner [:theme :table])
-            search-fn (partial select-om-all.utils/default-local-search false)
-            results (if (blank? query)
-                      table
-                      (vec (search-fn (map (juxt rest identity) table) query)))
-            rowHeight 50]
-        (html [:div.KeywordsThemeTable
-               (om/build Input {:label    "Search"
-                                :value    query
-                                :onChange #(do
-                                            (om/set-state-nr! owner :scrollToRow 0)
-                                            (om/set-state! owner :query (.. % -target -value)))})
-               #_(om/build Checkbox {:label "Selected keywords only"
-                                   :checked selected-filter
-                                   :on-change #(om/set-state! owner :selected-filter (not selected-filter))})
-               [:div {:ref "autowidth"}
-                (Table
-                  #js {:width                     width
-                       :maxHeight                 400
-                       :rowHeight                 rowHeight
-                       :rowGetter                 #(get results %)
-                       :rowsCount                 (count results)
-                       :headerHeight              30
-                       :onColumnResizeEndCallback #(do (om/set-state! owner [:columnWidths %2] (max %1 5))
-                                                       (om/set-state! owner :isColumnResizing false))
-                       :overflowX                 "hidden"
-                       :scrollToRow               scrollToRow
-                       :onScrollEnd               #(om/set-state! owner :scrollToRow (mod %2 rowHeight))
-                       :isColumnResizing          isColumnResizing}
-                  (Column
-                    #js {:label          ""
-                         :dataKey        0
-                         :align          "right"
-                         :cellDataGetter getter
-                         :cellRenderer   #(om/build Checkbox {:checked   (contains? uuids %)
-                                                              :on-change (fn [_]
-                                                                           (if (contains? uuids %)
-                                                                             (del-value! keywords (uuids %))
-                                                                             (add-value! keywords %)))})
-                         :width          (get columnWidths 0)
-                         :isResizable    true})
-                  (Column
-                    #js {:label          "Topic"
-                         :cellDataGetter getter
-                         :dataKey        1
-                         :cellRenderer   (fn [cellData dataKey rowData]
-                                           (om/build KeywordsThemeCell rowData))
-                         :flexGrow       1
-                         :width          (get columnWidths 1)
-                         :isResizable    true}))]
-               [:p "There are " (count table) " keywords in our database"]])))))
+
 
 
 (defn handle-highlight-new [owner item]
