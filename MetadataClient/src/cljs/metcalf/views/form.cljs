@@ -13,7 +13,7 @@
                                      del-value! add-value! add-field!]]
             [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
                                           TextareaField TextareaFieldProps CheckboxField
-                                          handle-value-change field-update! handle-checkbox-change]]
+                                          handle-checkbox-change]]
             [metcalf.views.highlight :refer [handle-highlight-new]]
             [metcalf.views.modal :refer [Modal]]
             [metcalf.handlers :as handlers]
@@ -179,28 +179,28 @@
         (html [:div.AddressField
                (om/build Input (assoc deliveryPoint
                                  :on-blur #(handlers/field-blur! deliveryPoint)
-                                 :on-change #(handle-value-change owner deliveryPoint %)))
+                                 :on-change #(handlers/value-change! owner deliveryPoint %)))
                (om/build Input (assoc deliveryPoint2
                                  :on-blur #(handlers/field-blur! deliveryPoint2)
-                                 :on-change #(handle-value-change owner deliveryPoint2 %)))
+                                 :on-change #(handlers/value-change! owner deliveryPoint2 %)))
                [:div.row
                 [:div.col-xs-6
                  (om/build Input (assoc city
                                    :help "City"
-                                   :on-change #(handle-value-change owner city %)))]
+                                   :on-change #(handlers/value-change! owner city %)))]
                 [:div.col-xs-6
                  (om/build Input (assoc administrativeArea
                                    :help "State/territory"
-                                   :on-change #(handle-value-change owner administrativeArea %)))]]
+                                   :on-change #(handlers/value-change! owner administrativeArea %)))]]
                [:div.row
                 [:div.col-xs-6
                  (om/build Input (assoc postalCode
                                    :help "Postal / Zip code"
-                                   :on-change #(handle-value-change owner postalCode %)))]
+                                   :on-change #(handlers/value-change! owner postalCode %)))]
                 [:div.col-xs-6
                  (om/build Input (assoc country
                                    :help "Country"
-                                   :on-change #(handle-value-change owner country %)))]]])))))
+                                   :on-change #(handlers/value-change! owner country %)))]]])))))
 
 (defn update-address! [contact {:keys [city organisationName deliveryPoint deliveryPoint2
                                        postalCode country administrativeArea]}]
@@ -256,13 +256,13 @@
 
                [:h4 (:value individualName)]
                (om/build Input (assoc individualName
-                                 :on-change #(handle-value-change owner individualName %)))
+                                 :on-change #(handlers/value-change! owner individualName %)))
 
                (om/build Input (assoc orcid
-                                 :on-change #(handle-value-change owner orcid %)))
+                                 :on-change #(handlers/value-change! owner orcid %)))
 
                (om/build Select (assoc role
-                                  :on-change #(handle-value-change owner role %)))
+                                  :on-change #(handlers/value-change! owner role %)))
 
                [:label "Organisation" (when (:required organisationName) " *")]
                (om/build OrganisationInputField path)
@@ -273,13 +273,13 @@
                [:div.ContactDetails
 
                 (om/build Input (assoc phone
-                                  :on-change #(handle-value-change owner phone %)))
+                                  :on-change #(handlers/value-change! owner phone %)))
 
                 (om/build Input (assoc facsimile
-                                  :on-change #(handle-value-change owner facsimile %)))
+                                  :on-change #(handlers/value-change! owner facsimile %)))
 
                 (om/build Input (assoc electronicMailAddress
-                                  :on-change #(handle-value-change owner electronicMailAddress %)))]])))))
+                                  :on-change #(handlers/value-change! owner electronicMailAddress %)))]])))))
 
 (defn FieldError [{:keys [errors label]} owner]
   (reify

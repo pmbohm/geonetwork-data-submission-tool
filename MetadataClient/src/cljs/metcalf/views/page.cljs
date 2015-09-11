@@ -13,7 +13,7 @@
             [metcalf.handlers :as handlers]
             [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
                                           TextareaField TextareaFieldProps CheckboxField
-                                          handle-value-change field-update! handle-checkbox-change]]
+                                          handle-checkbox-change]]
             [metcalf.views.form :refer [TableInlineEdit DataParametersTable Lodge AddressField
                                         OrganisationInputField ResponsiblePartyField FieldError
                                         PageErrors CreditField ResourceConstraints SupplementalInformation

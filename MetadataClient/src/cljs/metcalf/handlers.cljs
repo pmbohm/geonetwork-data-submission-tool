@@ -200,3 +200,6 @@
 (defn field-update! [owner field v]
   (om/update! field :value v)
   (put! (:pub-chan (om/get-shared owner)) {:topic (om/path field) :value v}))
+
+(defn value-change! [owner field event]
+  (field-update! owner field (-> event .-target .-value)))

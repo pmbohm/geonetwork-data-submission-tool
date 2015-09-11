@@ -11,9 +11,6 @@
             [condense.autocomplete :refer [AutoComplete]]
             [metcalf.handlers :as handlers]))
 
-(defn handle-value-change [owner field event]
-  (handlers/field-update! owner field (-> event .-target .-value)))
-
 (defn handle-checkbox-change [owner field event]
   (handlers/field-update! owner field (-> event .-target .-checked)))
 
@@ -27,7 +24,7 @@
                             (merge (dissoc props :path))
                             (assoc
                               :on-blur #(om/update! field :show-errors true)
-                              :on-change #(handle-value-change owner field %))))))))
+                              :on-change #(handlers/value-change! owner field %))))))))
 
 (defn DecimalField [path owner]
   (reify
@@ -38,7 +35,7 @@
         (om/build Input (assoc field
                           :class "wauto"
                           :on-blur #(om/update! field :show-errors true)
-                          :on-change #(handle-value-change owner field %)))))))
+                          :on-change #(handlers/value-change! owner field %)))))))
 
 (defn DateField [path owner]
   (reify
@@ -62,7 +59,7 @@
                            :disabled (or disabled (empty? options))
                            :default-option (if-not (empty? options) default-option "")
                            :on-blur #(om/update! field :show-errors true)
-                           :on-change #(handle-value-change owner field %)))))))
+                           :on-change #(handlers/value-change! owner field %)))))))
 
 (defn AutoCompleteField [path owner]
   (reify
@@ -73,7 +70,7 @@
         (om/build AutoComplete (assoc field
                                  :disabled (or disabled (empty? options))
                                  :default-option (if-not (empty? options) default-option "")
-                                 :on-change #(handle-value-change owner field %)))))))
+                                 :on-change #(handlers/value-change! owner field %)))))))
 
 (defn TextareaFieldProps [props owner]
   (reify
@@ -83,7 +80,7 @@
       (let [{:keys [path]} props
             field (observe-path owner path)]
         (om/build ExpandingTextarea (merge field (dissoc props :path)
-                                           {:on-change #(handle-value-change owner field %)
+                                           {:on-change #(handlers/value-change! owner field %)
                                             :on-blur #(om/update! field :show-errors true)}))))))
 
 (defn TextareaField [path owner]
@@ -94,7 +91,7 @@
       (let [field (observe-path owner path)]
         (om/build ExpandingTextarea (assoc field
                                       :on-blur #(om/update! field :show-errors true)
-                                      :on-change #(handle-value-change owner field %)))))))
+                                      :on-change #(handlers/value-change! owner field %)))))))
 
 (defn CheckboxField [path owner]
   (reify
