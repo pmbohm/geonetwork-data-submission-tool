@@ -3,7 +3,7 @@
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [sablono.core :refer-macros [html]]
-            [metcalf.globals :refer [observe-path app-state]]
+            [metcalf.globals :refer [observe-path]]
             goog.dom.classes
             goog.labs.userAgent.platform))
 

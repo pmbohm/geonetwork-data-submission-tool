@@ -4,7 +4,7 @@
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [sablono.core :refer-macros [html]]
-            [metcalf.globals :refer [observe-path app-state ref-path]]
+            [metcalf.globals :refer [observe-path ref-path]]
             [om-tick.field :refer [field-zipper field-edit reset-field field?]]
             [om-tick.bootstrap :refer [Select validation-state]]
             [condense.utils :refer [fmap]]
