@@ -202,54 +202,6 @@
     (om/set-state! owner :year (cljs-time.core/year date))))
 
 
-(defn Date1 [props owner]
-  (reify
-    om/IDisplayName (display-name [_] "Date")
-    om/IInitState
-    (init-state [_] {:year  ""
-                     :month ""
-                     :day   ""})
-
-    om/IWillMount
-    (will-mount [_]
-
-      (update-fields! owner (:value props)))
-
-    om/IDidUpdate
-    (did-update [_ prev-props prev-state]
-      (if-not (= (:value prev-props) (:value props))
-        (print :update-fields! :owner (:value props))))
-
-    om/IRenderState
-    (render-state [_ {:keys [year month day]}]
-      (let [{:keys [label value]} props
-            ;date (cljs-time.format/parse value)
-            ;day (cljs-time.core/day date)
-            ;month (cljs-time.core/month date)
-            ;year (cljs-time.core/year date)
-            update-value! #(om/update! props :value
-                                       (cljs-time.format/unparse
-                                         (cljs-time.format/formatters :year-month-day)
-                                         (cljs-time.core/date-time year month day)))]
-        (html [:div.Date
-               (label-template props)
-               [:div.DateInputs
-                (om/build Input {:value     day
-                                 :on-blur   #(update-value!)
-                                 :on-change #(om/set-state! owner :day (.. % -target -value))
-                                 :help      "DD" :size 2}) [:span.slash " / "]
-                (om/build Input {:value     month
-                                 :on-blur   #(update-value!)
-                                 :on-change #(om/set-state! owner :month (.. % -target -value))
-                                 :help      "MM" :size 2}) [:span.slash " / "]
-                (om/build Input {:value     year
-                                 :on-blur   #(update-value!)
-                                 :on-change #(om/set-state! owner :year (.. % -target -value))
-                                 :help      "YYYY" :size 4})
-                #_[:div [:div.btn.btn-md [:span.glyphicon.glyphicon-calendar]]]]
-               (help-block-template props)])))))
-
-
 (defn PikadayDate [props owner]
   (reify
     om/IDidMount
