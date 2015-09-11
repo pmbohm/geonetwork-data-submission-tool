@@ -5,9 +5,11 @@
             [om.dom :as dom :include-macros true]
             [sablono.core :refer-macros [html]]
             [metcalf.globals :refer [observe-path app-state]]
+            [condense.utils :refer [fmap]]
             [condense.fields :refer [Input Checkbox ExpandingTextarea validate-required-field
                                      help-block-template label-template
                                      del-value! add-value! add-field!]]
+            [metcalf.views.widget :refer [InputField TextareaFieldProps]]
             [metcalf.views.highlight :refer [handle-highlight-new]]))
 
 (defn TableInlineEdit [{:keys [ths tds-fn form field-path
@@ -75,3 +77,37 @@
                  [:button.btn.btn-primary
                   {:on-click #(new! default-field)}
                   [:span.glyphicon.glyphicon-plus] " Add new"])])))))
+
+(defn DataParameterRowEdit [path owner]
+  (reify
+    om/IDisplayName (display-name [_] "DataParameterDetail")
+    om/IRender
+    (render [_]
+      (let [props (observe-path owner path)
+            {:keys [name longName parameterDescription unit]} (:value props)]
+        (html [:div.DataParameterMaster
+               [:h3 "Edit parameter"]
+               (om/build InputField {:path (om/path longName)})
+               [:div.row
+                [:div.col-sm-6
+                 (om/build InputField {:path (om/path name)})]
+                [:div.col-sm-6
+                 (om/build InputField {:path (om/path unit)})]]
+               [:label "Additional parameter info"]
+               (om/build TextareaFieldProps
+                         {:path (om/path parameterDescription)})])))))
+
+
+(defn DataParametersTable [path owner]
+  (reify
+    om/IDisplayName (display-name [_] "DataParameters")
+    om/IRender
+    (render [_]
+      (html [:div.DataParametersTable
+             (om/build TableInlineEdit {:ths        ["Name" "Long name" "Unit of measurement" "Description"]
+                                        :tds-fn     (fn [field]
+                                                      (let [{:keys [parameterDescription unit name longName]}
+                                                            (fmap (comp #(or % "--") :value) (:value field))]
+                                                        [name longName unit parameterDescription]))
+                                        :form       DataParameterRowEdit
+                                        :field-path [:form :fields :identificationInfo :dataParameters]})]))))

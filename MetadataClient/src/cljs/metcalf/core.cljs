@@ -46,7 +46,7 @@
             [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
                                           TextareaField TextareaFieldProps CheckboxField
                                           handle-value-change field-update! handle-checkbox-change]]
-            [metcalf.views.form :refer [TableInlineEdit]]
+            [metcalf.views.form :refer [TableInlineEdit DataParametersTable]]
             [metcalf.views.highlight :refer [handle-highlight-new]]
             [metcalf.views.modal :refer [Modal]]
             [metcalf.views.fields.keyword :refer [ThemeKeywords ThemeKeywordsExtra TaxonKeywordsExtra
@@ -54,65 +54,6 @@
             [metcalf.views.fields.coverage :refer [GeographicCoverage VerticalCoverage]]))
 
 
-(defn MasterDetail
-  "
-  Take a many value field and present a master/detail view.
-  Selecting a master exposes the detail information.
-  "
-  [props owner]
-  (reify
-    om/IDisplayName (display-name [_] "MasterDetail")
-    om/IInitState (init-state [_] {:cursor (first (:value props))})
-    om/IRenderState
-    (render-state [_ {:keys [cursor]}]
-      (let [{:keys [master detail value]} props]
-        (html [:div.row.MasterDetail
-               [:div.col-sm-4
-                [:div.list-group
-                 (for [item value]
-                   [:a.list-group-item
-                    {:class    (if (= item cursor) "active")
-                     :on-click #(om/set-state! owner :cursor item)}
-                    (if-not (empty? (:errors item))
-                      [:span.badge (count (:errors item))])
-                    (om/build master item)])]]
-               [:div.col-sm-8
-                (if cursor
-                  (om/build detail cursor))]])))))
-
-(defn DataParameterRowEdit [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "DataParameterDetail")
-    om/IRender
-    (render [_]
-      (let [props (observe-path owner path)
-            {:keys [name longName parameterDescription unit]} (:value props)]
-        (html [:div.DataParameterMaster
-               [:h3 "Edit parameter"]
-               (om/build InputField {:path (om/path longName)})
-               [:div.row
-                [:div.col-sm-6
-                 (om/build InputField {:path (om/path name)})]
-                [:div.col-sm-6
-                 (om/build InputField {:path (om/path unit)})]]
-               [:label "Additional parameter info"]
-               (om/build TextareaFieldProps
-                         {:path (om/path parameterDescription)})])))))
-
-
-(defn DataParametersTable [path owner]
-  (reify
-    om/IDisplayName (display-name [_] "DataParameters")
-    om/IRender
-    (render [_]
-      (html [:div.DataParametersTable
-             (om/build TableInlineEdit {:ths        ["Name" "Long name" "Unit of measurement" "Description"]
-                                        :tds-fn     (fn [field]
-                                                      (let [{:keys [parameterDescription unit name longName]}
-                                                            (fmap (comp #(or % "--") :value) (:value field))]
-                                                        [name longName unit parameterDescription]))
-                                        :form       DataParameterRowEdit
-                                        :field-path [:form :fields :identificationInfo :dataParameters]})]))))
 
 
 (defn upload! [owner]
