@@ -36,7 +36,6 @@
             goog.events.EventType
             goog.events.FileDropHandler
             goog.events.FileDropHandler.EventType
-            goog.labs.userAgent.platform
             goog.net.EventType
             goog.net.IframeIo
             select-om-all.core
@@ -49,139 +48,15 @@
                                           TextareaField TextareaFieldProps CheckboxField
                                           handle-value-change field-update! handle-checkbox-change]]
             [metcalf.views.table :refer [Table Column ColumnGroup getter
-                                         KeywordsThemeCell KeywordsThemeTable]]))
+                                         KeywordsThemeCell KeywordsThemeTable]]
+            [metcalf.views.form :refer [TableInlineEdit handle-highlight-new]]
+            [metcalf.views.modal :refer [Modal]]))
 
 
 
 
 
 
-
-
-
-
-
-(defn handle-highlight-new [owner item]
-  (om/set-state! owner :highlight (conj (om/get-state owner :highlight) item))
-  (go (<! (timeout 5000))
-      (om/set-state! owner :highlight (disj (om/get-state owner :highlight) item))))
-
-
-(defn TableInlineEdit [{:keys [ths tds-fn form field-path
-                               placeholder default-field]
-                        :or   {tds-fn #(list (:value %))}} owner]
-  (reify
-    om/IDisplayName (display-name [_] "TableInlineEdit")
-    om/IInitState (init-state [_] {:cursor nil
-                                   :highlight #{}})
-    om/IRenderState
-    (render-state [_ {:keys [cursor highlight]}]
-      (let [{:keys [disabled] :as many-field} (observe-path owner field-path)
-            col-span (if ths (count ths) 1)
-            edit! (fn [field-path]
-                    (om/set-state! owner :cursor field-path))
-            delete! (fn [field]
-                      (om/set-state! owner :cursor nil)
-                      (del-value! many-field (last (om/path field))))
-            new! (fn [default-field]
-                   (let [values-ref (:value many-field)
-                         values-len (count values-ref)]
-                     (if default-field
-                       (add-field! many-field default-field)
-                       (add-field! many-field))
-                     (let [new-cursor (conj (om/path values-ref) values-len)]
-                       (om/set-state! owner :cursor new-cursor)
-                       (handle-highlight-new owner new-cursor))))]
-        (html [:div.TableInlineEdit
-               (help-block-template many-field)
-               (if (or (not placeholder) (-> many-field :value count pos?))
-                 [:table.table {:class (when-not disabled "table-hover")}
-                  (if ths [:thead [:tr (for [th ths]
-                                         [:th th])
-                                   [:th.xcell " "]]])
-                  [:tbody
-                   (for [field (:value many-field)]
-                     (let [field-path (om/path field)
-                           highlight-class (if (highlight field-path) "highlight")]
-                       (if (= cursor field-path)
-
-                         [:tr.active {:ref "edit"}
-                          [:td {:class highlight-class
-                                :col-span col-span}
-                           (om/build form cursor)
-                           [:button.btn.btn-primary {:on-click #(edit! nil)} "Done"] " "
-                           [:a.text-danger.pull-right {:on-click #(delete! field)}
-                            [:span.glyphicon.glyphicon-remove] " Delete"]]
-                          [:td.xcell {:class highlight-class}
-                           [:span.clickable-text
-                            {:on-click #(edit! nil)}
-                            [:span.glyphicon.glyphicon-remove]]]]
-
-
-                         [:tr.noselect {:ref      field-path
-                                        :on-click (when-not disabled
-                                                    #(edit! field-path))
-                                        :class    (if (= field-path cursor) "info")}
-                          (for [td-value (tds-fn field)]
-                            [:td td-value])
-                          [:td.xcell
-                           (when-not disabled
-                             [:span.glyphicon.glyphicon-edit.hover-only])]])))]]
-                 [:div {:style {:margin-bottom "1em"}} placeholder])
-               (when-not disabled
-                 [:button.btn.btn-primary
-                  {:on-click #(new! default-field)}
-                  [:span.glyphicon.glyphicon-plus] " Add new"])])))))
-
-
-
-(def ESCAPE-KEY-CODE 27)
-
-(defn Modal [props owner]
-  (reify
-
-    om/IDidMount
-    (did-mount [_]
-      (goog.dom.classes.add js/document.body "modal-open")
-      (let [key-down-callback (fn [e] (if (= ESCAPE-KEY-CODE (.-keyCode e))
-                                        (if-let [on-dismiss (:on-dismiss (om/get-props owner))]
-                                          (on-dismiss e))))]
-        (.addEventListener js/window "keydown" key-down-callback)
-        (om/set-state! owner :key-down-callback key-down-callback)))
-
-    om/IWillUnmount
-    (will-unmount [_]
-      (goog.dom.classes.remove js/document.body "modal-open")
-      (.removeEventListener js/window "keydown" (om/get-state owner :key-down-callback)))
-
-    om/IRender
-    (render [_]
-      (let [{:keys [modal-header modal-body dialog-class hide-footer
-                    on-save on-cancel on-dismiss ok-copy loading]
-             :or   {on-save identity on-cancel identity on-dismiss identity}} props]
-        (html [:div.modal-open
-               [:div.modal.in {:style {:display "block"}    ;:tabIndex -1
-                               }
-                [:div.modal-dialog {:class dialog-class}
-                 [:div.modal-content
-                  [:div.modal-header
-                   [:button.close {:disabled loading :on-click #(on-dismiss %)}
-                    [:span {:dangerouslySetInnerHTML {:__html "&times;"}}]]
-                   [:h4.modal-title modal-header]]
-                  [:div.modal-body modal-body]
-                  (if-not hide-footer
-                    [:div.modal-footer
-                     (if loading [:span [:span.fa.fa-spinner.fa-spin] " "])
-                     [:button.btn.btn-default {:disabled loading
-                                               :on-click #(on-cancel %)} "Cancel"]
-                     [:button.btn.btn-primary {:disabled loading
-                                               :on-click #(on-save %)} (or ok-copy "OK")]])]]]
-               [:div.modal-backdrop.in {:style    (if (goog.labs.userAgent.platform/isIos)
-                                                    {:position "sticky" :top 0} ; NOTE: attempt to avoid keyboard bug
-                                                    {:position "fixed"} ;GOTCHA: Large modals / scrolling is messy
-                                                    )
-                                        :disabled loading
-                                        :on-click #(on-dismiss %)}]])))))
 
 
 
