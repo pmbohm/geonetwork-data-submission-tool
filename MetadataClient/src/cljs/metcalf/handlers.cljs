@@ -207,8 +207,17 @@
 (defn hide-errors! [form]
   (om/update! form :show-errors false))
 
+(defn show-errors! [form]
+  (om/update! form :show-errors true))
+
 (defn hide-create-modal! []
   (om/update! (ref-path [:page]) :show-create-modal false))
 
 (defn show-create-modal! []
   (om/update! (ref-path [:page]) :show-create-modal true))
+
+(defn tab-click! [page id]
+  (om/update! page [:tab] id))
+
+(defn status-filter! [page x]
+  (om/update! page :status-filter x))

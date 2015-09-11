@@ -261,8 +261,8 @@
                      [:li {:class (if (= id (get page :tab :data-identification)) "active")}
                       [:a {:style    {:cursor "pointer"}
                            :on-click #(do
-                                       (if has-errors? (om/update! form :show-errors true))
-                                       (om/update! page [:tab] id))} text]]))
+                                       (if has-errors? (handlers/show-errors! form))
+                                       (handlers/tab-click! page id))} text]]))
                  [:div.pull-right.hidden-xs.hidden-sm
                   (when-not disabled (om/build ProgressBar nil))]]
                 [:div.PageViewBody
@@ -437,7 +437,7 @@
                 [:div.list-group
                  (om/build-all DocumentTeaser filtered-docs)
                  (if (empty? documents)
-                   [:a.list-group-item {:on-click #(do (om/update! page :show-create-modal true)
+                   [:a.list-group-item {:on-click #(do (show-create-modal!)
                                                        (.preventDefault %))
                                         :href (:Create urls)}
                     [:span.glyphicon.glyphicon-star.pull-right]
@@ -449,12 +449,12 @@
                      (if (= status-filter logic/active-status-filter)
                        [:div
                         [:p "You don't have any active records: "
-                         [:a {:on-click #(om/update! page :status-filter (set (keys status-freq)))}
+                         [:a {:on-click #(handlers/status-filter! page (set (keys status-freq)))}
                           "show all documents"] "."]
                         (om/build NewDocumentButton nil)]
                        [:div
                         [:p "No documents match your filter: "
-                         [:a {:on-click #(om/update! page :status-filter (set (keys status-freq)))}
+                         [:a {:on-click #(handlers/status-filter! page (set (keys status-freq)))}
                           "show all documents"] "."]
                         (om/build NewDocumentButton nil)])))]]
                [:div.col-sm-3
