@@ -12,8 +12,8 @@
              "resources/public/js/prod"
              "resources/public/js/prod.js"]
 
-            :dependencies [[org.clojure/clojure "1.7.0-RC1"]
-                           [org.clojure/clojurescript "0.0-3291" :scope "provided"]
+            :dependencies [[org.clojure/clojure "1.7.0"]
+                           [org.clojure/clojurescript "1.7.122"]
                            [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                            [org.clojure/core.match "0.3.0-alpha4"]
                            [figwheel "0.3.3"]
