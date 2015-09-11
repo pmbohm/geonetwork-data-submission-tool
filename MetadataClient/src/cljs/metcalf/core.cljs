@@ -8,6 +8,7 @@
             [metcalf.views.page :refer [PageView]]
             [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]
             [metcalf.handlers :as handlers]
+            condense.performance
             goog.userAgent))
 
 (defn LegacyIECompatibility [props owner]
