@@ -4,7 +4,7 @@
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [sablono.core :refer-macros [html]]
-            [metcalf.globals :refer [observe-path app-state]]
+            [metcalf.globals :refer [observe-path]]
             [om-tick.bootstrap :refer [Select validation-state]]
             [condense.fields :refer [Input Checkbox ExpandingTextarea validate-required-field
                                      help-block-template label-template

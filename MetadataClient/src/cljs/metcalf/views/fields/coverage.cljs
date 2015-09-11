@@ -2,7 +2,7 @@
   (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [sablono.core :refer-macros [html]]
-            [metcalf.globals :refer [observe-path app-state]]
+            [metcalf.globals :refer [observe-path]]
             [openlayers-om-components.geographic-element :refer [BoxMap]]
             [metcalf.views.form :refer [TableInlineEdit]]
             [metcalf.views.widget :refer [InputField SelectField CheckboxField]]
