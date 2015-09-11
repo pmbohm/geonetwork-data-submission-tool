@@ -258,3 +258,11 @@
 
 (defn del-element! [geographicElements element]
   (om/transact! geographicElements #(vec (remove (partial = {:value element}) %))))
+
+(defn add-keyword! [keywords value]
+  (when-not (empty? value)
+    (om/update! keywords (vec (conj keywords {:value value})))))
+
+(defn del-keyword! [keywords value]
+  (om/update! keywords (vec (remove #(= value (:value %)) keywords))))
+

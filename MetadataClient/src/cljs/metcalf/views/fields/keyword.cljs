@@ -20,7 +20,8 @@
             goog.dom.ViewportSizeMonitor
             goog.events
             goog.events.EventType
-            goog.style))
+            goog.style
+            [metcalf.handlers :as handlers]))
 
 
 (def Table (js/React.createFactory js/FixedDataTable.Table))
@@ -116,13 +117,6 @@
                [:p "There are " (count table) " keywords in our database"]])))))
 
 
-(defn add-keyword [keywords value]
-  (when-not (empty? value)
-    (om/update! keywords (vec (conj keywords {:value value})))))
-
-(defn del-keyword [keywords value]
-  (om/update! keywords (vec (remove #(= value (:value %)) keywords))))
-
 (defn ThemeKeywords [_ owner]
   (reify
     om/IDisplayName (display-name [_] "ThemeKeywords")
@@ -200,10 +194,10 @@
                          (om/set-state! owner :new-value v))
             add-value! (fn []
                          (when-not (empty? new-value)
-                           (add-keyword value new-value)
+                           (handlers/add-keyword! value new-value)
                            (handle-highlight-new owner new-value)
                            (set-value! "")))
-            del-value! #(del-keyword value %)]
+            del-value! #(handlers/del-keyword! value %)]
         (html [:div.ThemeKeywordsExtra {:class (validation-state props)}
                (label-template props)
                (help-block-template props)
@@ -241,10 +235,10 @@
       (let [{:keys [value required placeholder disabled] :as props} (observe-path owner [:form :fields :identificationInfo :keywordsTaxonExtra :keywords])
             set-value! #(om/set-state! owner :new-value %)
             add-value! #(when-not (empty? new-value)
-                         (add-keyword value new-value)
+                         (handlers/add-keyword! value new-value)
                          (handle-highlight-new owner new-value)
                          (set-value! nil))
-            del-value! #(del-keyword value %)]
+            del-value! #(handlers/del-keyword! value %)]
         (html [:div.TaxonKeywordsExtra {:class (validation-state props)}
                [:label "Taxon keywords" (if required " *")]
                (help-block-template props)
