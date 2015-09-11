@@ -45,25 +45,12 @@
             select-om-all.utils
             [metcalf.routing :as router]
             [metcalf.views.page :refer [PageView PageTabView]]
-            [metcalf.globals :refer [app-state pub-chan notif-chan]]))
+            [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]))
 
 
 
 (defn ^:export app-state-js []
   (clj->js @app-state))
-
-(defn ref-path
-  "Return a ref cursor at a specified path"
-  [path]
-  (let [rc (om/root-cursor app-state)]
-    (assert (get-in rc path) (str "No value found in app-state at: " path))
-    (-> rc (get-in path) om/ref-cursor)))
-
-(defn observe-path
-  "Observes and returns a reference cursor at path and it's value including any derived state."
-  [owner path]
-  {:pre [(om/component? owner)]}
-  (om/observe owner (ref-path path)))
 
 (defn deep-merge
   "Recursively merges maps. If keys are not maps, the last value wins."
