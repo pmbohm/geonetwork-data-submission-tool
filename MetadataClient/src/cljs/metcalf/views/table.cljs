@@ -6,6 +6,7 @@
             [metcalf.globals :refer [observe-path]]
             [condense.fields :refer [Input Checkbox del-value! add-value!]]
             cljsjs.fixed-data-table
+            select-om-all.utils
             goog.dom
             goog.dom.ViewportSizeMonitor
             goog.events
