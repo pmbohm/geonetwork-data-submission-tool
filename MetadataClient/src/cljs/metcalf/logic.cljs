@@ -192,3 +192,17 @@
   (cond-> state
     data derive-data-state
     create_form (update-in [:create_form] validate-required-fields)))
+
+(defn geographicElement->extent
+  "Transform our API specific bbox data into something generic for Openlayers"
+  [{:keys [northBoundLatitude westBoundLongitude eastBoundLongitude southBoundLatitude]}]
+  (map :value [westBoundLongitude southBoundLatitude eastBoundLongitude northBoundLatitude]))
+
+(defn extent->geographicElement
+  [[westBoundLongitude southBoundLatitude eastBoundLongitude northBoundLatitude]]
+  (let [northBoundLatitude (+ northBoundLatitude (if (= northBoundLatitude southBoundLatitude) 1e-6 0))
+        eastBoundLongitude (+ eastBoundLongitude (if (= westBoundLongitude eastBoundLongitude) 1e-6 0))]
+    {:westBoundLongitude {:value westBoundLongitude}
+     :southBoundLatitude {:value southBoundLatitude}
+     :eastBoundLongitude {:value eastBoundLongitude}
+     :northBoundLatitude {:value northBoundLatitude}}))

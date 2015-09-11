@@ -7,30 +7,9 @@
             [metcalf.views.form :refer [TableInlineEdit]]
             [metcalf.views.widget :refer [InputField SelectField CheckboxField]]
             [condense.fields :refer [Input]]
-            [clojure.string :as string]))
-
-(defn geographicElement->extent
-  "Transform our API specific bbox data into something generic for Openlayers"
-  [{:keys [northBoundLatitude westBoundLongitude eastBoundLongitude southBoundLatitude]}]
-  (map :value [westBoundLongitude southBoundLatitude eastBoundLongitude northBoundLatitude]))
-
-(defn extent->geographicElement
-  [[westBoundLongitude southBoundLatitude eastBoundLongitude northBoundLatitude]]
-  (let [northBoundLatitude (+ northBoundLatitude (if (= northBoundLatitude southBoundLatitude) 1e-6 0))
-        eastBoundLongitude (+ eastBoundLongitude (if (= westBoundLongitude eastBoundLongitude) 1e-6 0))]
-    {:westBoundLongitude {:value westBoundLongitude}
-     :southBoundLatitude {:value southBoundLatitude}
-     :eastBoundLongitude {:value eastBoundLongitude}
-     :northBoundLatitude {:value northBoundLatitude}}))
-
-(defn add-extent! [geographicElements extent]
-  (om/transact! geographicElements #(conj % {:value (extent->geographicElement extent)})))
-
-(defn update-extent! [geographicElements i [_ extent]]
-  (om/update! geographicElements [i :value] (extent->geographicElement extent)))
-
-(defn del-element! [geographicElements element]
-  (om/transact! geographicElements #(vec (remove (partial = {:value element}) %))))
+            [clojure.string :as string]
+            [metcalf.logic :as logic]
+            [metcalf.handlers :as handlers]))
 
 (defn ->float [s]
   (let [f (js/parseFloat s)]
@@ -80,19 +59,19 @@
         (let [n-field (om/build CoordInputField {:abbr        "N"
                                                  :max         90 :min -90
                                                  :placeholder "Northbound" :value (:value northBoundLatitude)
-                                                 :on-change   #(om/update! northBoundLatitude :value %)})
+                                                 :on-change   #(handlers/field-update! owner northBoundLatitude %)})
               e-field (om/build CoordInputField {:abbr "E"
                                                  :max 180 :min -180
                                                  :placeholder "Eastbound" :value (:value eastBoundLongitude)
-                                                 :on-change   #(om/update! eastBoundLongitude :value %)})
+                                                 :on-change   #(handlers/field-update! owner eastBoundLongitude %)})
               s-field (om/build CoordInputField {:abbr "S"
                                                  :max 90 :min -90
                                                  :placeholder "Southbound" :value (:value southBoundLatitude)
-                                                 :on-change   #(om/update! southBoundLatitude :value %)})
+                                                 :on-change   #(handlers/field-update! owner southBoundLatitude %)})
               w-field (om/build CoordInputField {:abbr "W"
                                                  :max 180 :min -180
                                                  :placeholder "Westbound" :value (:value westBoundLongitude)
-                                                 :on-change   #(om/update! westBoundLongitude :value %)})]
+                                                 :on-change   #(handlers/field-update! owner westBoundLongitude %)})]
           (html [:div.CoordField
                  [:div.row [:div.col-sm-6.col-sm-offset-3.col-lg-4.col-lg-offset-2
                             [:div.n-block n-field]]]
@@ -121,7 +100,7 @@
     (render-state [_ {:keys [boundaries]}]
       (let [{:keys [disabled] :as geographicElement} (observe-path owner [:form :fields :identificationInfo :geographicElement])
             geographicElements (:value geographicElement)
-            extents (map (comp geographicElement->extent :value) geographicElements)]
+            extents (map (comp logic/geographicElement->extent :value) geographicElements)]
         (html [:div.GeographicCoverage
                [:h4 "Geographic Coverage"]
                [:div.row
@@ -131,12 +110,12 @@
                             :disabled             disabled
                             :center               [147 -42]
                             :zoom                 6
-                            :on-boxend            (partial add-extent! geographicElements)
+                            :on-boxend            (partial handlers/add-extent! geographicElements)
                             :on-view-change       (fn [extent]
                                                     (om/set-state! owner :boundaries
                                                                    (mapv #(-> %2 (- %1) (* 0.25) (+ %1)) extent (->> extent cycle (drop 2)))))
                             :mark-change-debounce 400
-                            :on-mark-change       (partial update-extent! geographicElements)})
+                            :on-mark-change       (partial handlers/update-extent! geographicElements)})
 
                  [:em "Hold down shift to draw a box."]]
                 [:div.col-sm-6
@@ -149,7 +128,7 @@
                                                                 (print-nice (:value westBoundLongitude))
                                                                 (print-nice (:value southBoundLatitude))
                                                                 (print-nice (:value eastBoundLongitude))]))
-                                            :default-field {:value (extent->geographicElement boundaries)}
+                                            :default-field {:value (logic/extent->geographicElement boundaries)}
                                             :form          CoordField
                                             :field-path    [:form :fields :identificationInfo :geographicElement]
                                             :placeholder   [:em {:style {:color "#a94442"}} "Specify the location(s) of this study."]})]]])))))

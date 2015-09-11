@@ -249,3 +249,12 @@
                      (update-in [:value :address :administrativeArea :value] reverse-or administrativeArea)
                      (update-in [:value :address :postalCode :value] reverse-or postalCode)
                      (update-in [:value :address :country :value] reverse-or country))))
+
+(defn add-extent! [geographicElements extent]
+  (om/transact! geographicElements #(conj % {:value (logic/extent->geographicElement extent)})))
+
+(defn update-extent! [geographicElements i [_ extent]]
+  (om/update! geographicElements [i :value] (logic/extent->geographicElement extent)))
+
+(defn del-element! [geographicElements element]
+  (om/transact! geographicElements #(vec (remove (partial = {:value element}) %))))
