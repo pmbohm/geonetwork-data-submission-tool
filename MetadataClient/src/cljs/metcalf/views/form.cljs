@@ -312,7 +312,7 @@
         (if (and show-errors (not (empty? fields)))
           (html [:div.alert.alert-info.alert-dismissable
                  [:button {:type "button" :class "close"
-                           :on-click #(om/update! form :show-errors false)} "×"]
+                           :on-click #(handlers/hide-errors! form)} "×"]
                  (if (> (count fields) 1)
                    [:div
                     [:b "There are multiple fields on this page that require your attention:"]

@@ -203,3 +203,6 @@
 
 (defn value-change! [owner field event]
   (field-update! owner field (-> event .-target .-value)))
+
+(defn hide-errors! [form]
+  (om/update! form :show-errors false))
