@@ -51,32 +51,8 @@
             [metcalf.views.modal :refer [Modal]]
             [metcalf.views.fields.keyword :refer [ThemeKeywords ThemeKeywordsExtra TaxonKeywordsExtra
                                                   KeywordsThemeTable]]
-            [metcalf.views.fields.coverage :refer [GeographicCoverage]]))
+            [metcalf.views.fields.coverage :refer [GeographicCoverage VerticalCoverage]]))
 
-
-
-
-
-
-
-(defn VerticalCoverage [props owner]
-  (reify
-    om/IDisplayName (display-name [_] "VerticalCoverage")
-    om/IRender
-    (render [_]
-      (let [{hasVerticalExtent :value} (observe-path owner [:form :fields :identificationInfo :verticalElement :hasVerticalExtent])]
-        (html [:div.VerticalCoverage
-               [:h4 "Vertical Coverage"]
-               (om/build CheckboxField [:form :fields :identificationInfo :verticalElement :hasVerticalExtent])
-               (if hasVerticalExtent
-                 [:div
-                  (om/build SelectField [:form :fields :identificationInfo :verticalElement :verticalCRS])
-                  (om/build InputField
-                            {:path [:form :fields :identificationInfo :verticalElement :minimumValue]
-                             :class "wauto"})
-                  (om/build InputField
-                            {:path [:form :fields :identificationInfo :verticalElement :maximumValue]
-                             :class "wauto"})])])))))
 
 (defn MasterDetail
   "
@@ -103,7 +79,6 @@
                [:div.col-sm-8
                 (if cursor
                   (om/build detail cursor))]])))))
-
 
 (defn DataParameterRowEdit [path owner]
   (reify

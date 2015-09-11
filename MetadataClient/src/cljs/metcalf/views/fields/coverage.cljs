@@ -5,6 +5,7 @@
             [metcalf.globals :refer [observe-path app-state]]
             [openlayers-om-components.geographic-element :refer [BoxMap]]
             [metcalf.views.form :refer [TableInlineEdit]]
+            [metcalf.views.widget :refer [InputField SelectField CheckboxField]]
             [condense.fields :refer [Input]]
             [clojure.string :as string]))
 
@@ -102,7 +103,6 @@
                   [:div.col-sm-6.col-sm-offset-3.col-lg-4.col-lg-offset-2
                    [:div.s-block s-field]]]]))))))
 
-
 (defprotocol IPrintNice
   (print-nice [x]))
 
@@ -153,3 +153,22 @@
                                             :form          CoordField
                                             :field-path    [:form :fields :identificationInfo :geographicElement]
                                             :placeholder   [:em {:style {:color "#a94442"}} "Specify the location(s) of this study."]})]]])))))
+
+(defn VerticalCoverage [props owner]
+  (reify
+    om/IDisplayName (display-name [_] "VerticalCoverage")
+    om/IRender
+    (render [_]
+      (let [{hasVerticalExtent :value} (observe-path owner [:form :fields :identificationInfo :verticalElement :hasVerticalExtent])]
+        (html [:div.VerticalCoverage
+               [:h4 "Vertical Coverage"]
+               (om/build CheckboxField [:form :fields :identificationInfo :verticalElement :hasVerticalExtent])
+               (if hasVerticalExtent
+                 [:div
+                  (om/build SelectField [:form :fields :identificationInfo :verticalElement :verticalCRS])
+                  (om/build InputField
+                            {:path [:form :fields :identificationInfo :verticalElement :minimumValue]
+                             :class "wauto"})
+                  (om/build InputField
+                            {:path [:form :fields :identificationInfo :verticalElement :maximumValue]
+                             :class "wauto"})])])))))
