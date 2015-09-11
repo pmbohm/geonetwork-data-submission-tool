@@ -5,8 +5,15 @@
     [condense.fields :refer [validate-required-field]]
     [condense.utils :refer [keys-in int-assoc-in fmap]]
     [metcalf.progress :refer [progress-score]]
-    [om-tick.field :refer [tree-edit field-edit field-zipper field?]]))
+    [tailrecursion.priority-map :refer [priority-map]]
+    [om-tick.field :refer [tree-edit field-edit field-zipper field?]]
+    [clojure.string :as string]))
 
+(defn theme-option [[uuid & tokens]]
+  [uuid (string/join " | " (take-while (complement empty?) tokens))])
+
+(defn init-theme-options [{:keys [table] :as theme}]
+  (assoc theme :options (into (priority-map) (map theme-option table))))
 
 (defn field-walk
   "Tweaked walker which treats fields/branches in a specific way"

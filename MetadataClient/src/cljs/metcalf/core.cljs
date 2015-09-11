@@ -20,14 +20,13 @@
             [om-tick.bootstrap :refer [Select Date validation-state]]
             [condense.autocomplete :refer [AutoComplete]]
             [openlayers-om-components.geographic-element :refer [BoxMap]]
-            [metcalf.logic :refer [extract-field-values]]
+            [metcalf.logic :as logic :refer [extract-field-values]]
             [metcalf.content :refer [default-payload contact-groups]]
 
             [condense.utils :refer [fmap title-case keys-in
                                     int-assoc-in map-keys vec-remove enum]]
             cljsjs.moment
             cljsjs.fixed-data-table
-            [tailrecursion.priority-map :refer [priority-map]]
             condense.watch-state
             condense.performance
             [condense.history :as history]
@@ -43,6 +42,7 @@
             goog.net.IframeIo
             select-om-all.core
             select-om-all.utils
+            [metcalf.utils :refer [deep-merge]]
             [metcalf.routing :as router]
             [metcalf.views.page :refer [PageView PageTabView]]
             [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]))
@@ -51,19 +51,6 @@
 
 (defn ^:export app-state-js []
   (clj->js @app-state))
-
-(defn deep-merge
-  "Recursively merges maps. If keys are not maps, the last value wins."
-  [& vals]
-  (if (every? map? vals)
-    (apply merge-with deep-merge vals)
-    (last vals)))
-
-(defn theme-option [[uuid & tokens]]
-  [uuid (string/join " | " (take-while (complement empty?) tokens))])
-
-(defn init-theme-options [{:keys [table] :as theme}]
-  (assoc theme :options (into (priority-map) (map theme-option table))))
 
 
 (defn path-values
@@ -115,7 +102,7 @@
   [payload]
   (-> (deep-merge default-payload payload)
       (update :form initialise-form)
-      (update :theme init-theme-options)))
+      (update :theme logic/init-theme-options)))
 
 (defn field-update! [owner field v]
   (om/update! field :value v)
