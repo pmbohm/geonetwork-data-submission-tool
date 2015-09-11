@@ -13,6 +13,7 @@
             [metcalf.content :refer [default-payload]]
             [metcalf.logic :as logic]
             [metcalf.content :refer [contact-groups]]
+            [metcalf.utils :refer [reverse-or]]
             goog.net.Cookies))
 
 (defn init-theme-options [{:keys [table] :as theme}]
@@ -221,3 +222,15 @@
 
 (defn status-filter! [page x]
   (om/update! page :status-filter x))
+
+(defn update-address! [contact {:keys [city organisationName deliveryPoint deliveryPoint2
+                                       postalCode country administrativeArea]}]
+  (om/transact! contact
+                #(-> %
+                     (assoc-in [:value :organisationName :value] organisationName)
+                     (update-in [:value :address :deliveryPoint :value] reverse-or deliveryPoint)
+                     (update-in [:value :address :deliveryPoint2 :value] reverse-or deliveryPoint2)
+                     (update-in [:value :address :city :value] reverse-or city)
+                     (update-in [:value :address :administrativeArea :value] reverse-or administrativeArea)
+                     (update-in [:value :address :postalCode :value] reverse-or postalCode)
+                     (update-in [:value :address :country :value] reverse-or country))))

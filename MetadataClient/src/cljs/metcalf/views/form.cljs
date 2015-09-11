@@ -17,7 +17,6 @@
             [metcalf.views.highlight :refer [handle-highlight-new]]
             [metcalf.views.modal :refer [Modal]]
             [metcalf.handlers :as handlers]
-            [metcalf.utils :refer [reverse-or]]
             [clojure.string :as string]
             [clojure.zip :as zip]))
 
@@ -202,18 +201,6 @@
                                    :help "Country"
                                    :on-change #(handlers/value-change! owner country %)))]]])))))
 
-(defn update-address! [contact {:keys [city organisationName deliveryPoint deliveryPoint2
-                                       postalCode country administrativeArea]}]
-  (om/transact! contact
-                #(-> %
-                     (assoc-in [:value :organisationName :value] organisationName)
-                     (update-in [:value :address :deliveryPoint :value] reverse-or deliveryPoint)
-                     (update-in [:value :address :deliveryPoint2 :value] reverse-or deliveryPoint2)
-                     (update-in [:value :address :city :value] reverse-or city)
-                     (update-in [:value :address :administrativeArea :value] reverse-or administrativeArea)
-                     (update-in [:value :address :postalCode :value] reverse-or postalCode)
-                     (update-in [:value :address :country :value] reverse-or country))))
-
 (defn re-escape
   [s]
   (string/replace s #"[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]" #(str "\\" %)))
@@ -242,7 +229,7 @@
                           :index-fn     :organisationName
                           :undisplay-fn (fn [s] {:organisationName s})
                           :on-change    (fn [institution]
-                                          (update-address! party-field institution))})])))))
+                                          (handlers/update-address! party-field institution))})])))))
 
 (defn ResponsiblePartyField [path owner]
   (reify
