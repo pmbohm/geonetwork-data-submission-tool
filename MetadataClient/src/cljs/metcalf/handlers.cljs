@@ -190,3 +190,6 @@
 
 (defn reset-form! []
   (swap! app-state update :form reset-form))
+
+(defn attach-success! [new-attachment]
+  (swap! app-state update-in [:attachments] conj new-attachment))

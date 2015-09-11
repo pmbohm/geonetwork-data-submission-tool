@@ -4,14 +4,15 @@
             [ajax.core :refer [DELETE]]
             [om.core :as om :include-macros true]
             [sablono.core :refer-macros [html]]
-            [metcalf.globals :refer [observe-path app-state]]
+            [metcalf.globals :refer [observe-path]]
             [condense.utils :refer [map-keys]]
             goog.net.IframeIo
             goog.events
             goog.events.EventType
             goog.events.FileDropHandler
             goog.events.FileDropHandler.EventType
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [metcalf.handlers :as handlers]))
 
 (defn upload! [owner]
   (let [form (om/get-node owner "upload-form")
@@ -27,8 +28,7 @@
                                            .getResponseJson
                                            js->clj
                                            (map-keys keyword)
-                                           (swap! app-state update-in
-                                                  [:attachments] conj))))
+                                           handlers/attach-success!)))
     (goog.events.listen
       io goog.net.EventType.ERROR #(js/console.log "ERROR"))
     (goog.events.listen
