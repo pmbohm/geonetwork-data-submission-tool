@@ -6,3 +6,9 @@
   (if (every? map? vals)
     (apply merge-with deep-merge vals)
     (last vals)))
+
+(defn reverse-or
+  "Reverse OR:
+   use it to update source value only if destination value is not falsey."
+  [a b]
+  (or b a))

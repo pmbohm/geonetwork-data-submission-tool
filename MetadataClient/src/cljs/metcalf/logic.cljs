@@ -8,6 +8,8 @@
     [om-tick.field :refer [tree-edit field-edit field-zipper field?]]
     [clojure.string :as string]))
 
+(def active-status-filter #{"Draft" "Submitted"})
+
 (defn theme-option [[uuid & tokens]]
   [uuid (string/join " | " (take-while (complement empty?) tokens))])
 
