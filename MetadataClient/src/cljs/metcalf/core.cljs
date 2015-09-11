@@ -47,174 +47,17 @@
             [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
                                           TextareaField TextareaFieldProps CheckboxField
                                           handle-value-change field-update! handle-checkbox-change]]
-            [metcalf.views.table :refer [Table Column ColumnGroup getter
-                                         KeywordsThemeCell KeywordsThemeTable]]
-            [metcalf.views.form :refer [TableInlineEdit handle-highlight-new]]
-            [metcalf.views.modal :refer [Modal]]))
+            [metcalf.views.form :refer [TableInlineEdit]]
+            [metcalf.views.highlight :refer [handle-highlight-new]]
+            [metcalf.views.modal :refer [Modal]]
+            [metcalf.views.fields.keyword :refer [ThemeKeywords ThemeKeywordsExtra TaxonKeywordsExtra
+                                                  KeywordsThemeTable]]))
 
 
 
 
 
 
-
-
-
-(defn add-keyword [keywords value]
-  (when-not (empty? value)
-    (om/update! keywords (vec (conj keywords {:value value})))))
-
-(defn del-keyword [keywords value]
-  (om/update! keywords (vec (remove #(= value (:value %)) keywords))))
-
-(defn ThemeKeywords [_ owner]
-  (reify
-    om/IDisplayName (display-name [_] "ThemeKeywords")
-    om/IInitState (init-state [_] {:new-value nil
-                                   :show-modal false
-                                   :highlight #{}})
-    om/IRenderState
-    (render-state [_ {:keys [new-value show-modal highlight]}]
-      (let [{:keys [keywords]} (observe-path owner [:form :fields :identificationInfo :keywordsTheme])
-            {:keys [value placeholder disabled] :as props} keywords
-            theme-options (observe-path owner [:theme :options])
-            theme-table (observe-path owner [:theme :table])
-            set-value! #(om/set-state! owner :new-value %)
-            add! (fn [new-value] (when-not (empty? new-value)
-                                   (let [uuid (first new-value)]
-                                     (when (not-any? (comp #{uuid} :value)
-                                                     (:value keywords))
-                                       (add-value! keywords uuid)))
-                                   (handle-highlight-new owner new-value)
-                                   (set-value! nil)))
-            lookup (fn [uuid] (first (filterv #(= uuid (first %)) theme-table)))
-            show-modal! #(om/set-state! owner :show-modal true)
-            hide-modal! #(om/set-state! owner :show-modal false)]
-          (html [:div.ThemeKeywords {:class (validation-state props)}
-                 (if show-modal (om/build Modal (assoc props
-                                            :ok-copy "OK"
-                                            :dialog-class "modal-lg"
-                                            :modal-header (html [:span [:span.glyphicon.glyphicon-list] " " "Research theme keywords"])
-                                            :modal-body (html [:div
-                                                               [:p.help-block "Select keyword(s) to add to record"]
-                                                               (om/build KeywordsThemeTable nil)])
-                                            :on-dismiss #(hide-modal!)
-                                            :hide-footer true)))
-               (label-template props)
-               (help-block-template props)
-               [:table.table.keyword-table {:class (if-not disabled "table-hover")}
-                [:tbody
-                 (for [[i keyword] (enum value)]
-                   [:tr {:class (if disabled "active" (if (highlight (:value keyword)) "highlight"))}
-                    [:td (om/build KeywordsThemeCell (lookup (:value keyword)))]
-                    (if-not disabled
-                      [:td [:button.btn.btn-warn.btn-xs.pull-right
-                            {:on-click #(del-value! keywords i)}
-                            [:span.glyphicon.glyphicon-minus]]])])]]
-                 (if-not disabled
-                   [:div.row
-                    [:div.col-sm-8
-                     (om/build select-om-all.core/AutoComplete
-                               {:placeholder placeholder
-
-                                :value       ""
-                                :datasource  theme-table
-                                :get-cols    (fn [x]
-                                               [(om/build KeywordsThemeCell x)])
-                                :rowHeight   50
-                                :index-fn    rest
-                                :display-fn  (fn [] "")
-                                :on-change   #(do (add! %)
-                                                  [:select-om-all.core/set ""])})]
-                    [:div.col-sm-4
-                     [:div {:style {:whitespace :no-wrap}}
-                      [:button.btn.btn-default
-                       {:on-click #(show-modal!)}
-                       [:span.glyphicon.glyphicon-list] " Browse"]]]])])))))
-
-
-(defn ThemeKeywordsExtra [_ owner]
-  (reify
-    om/IDisplayName (display-name [_] "ThemeKeywordsExtra")
-    om/IInitState (init-state [_] {:new-value ""
-                                   :highlight #{}})
-    om/IRenderState
-    (render-state [_ {:keys [new-value highlight]}]
-      (let [{:keys [value placeholder disabled] :as props} (observe-path owner [:form :fields :identificationInfo :keywordsThemeExtra :keywords])
-            set-value! (fn [v]
-                         (om/set-state! owner :new-value v))
-            add-value! (fn []
-                         (when-not (empty? new-value)
-                           (add-keyword value new-value)
-                           (handle-highlight-new owner new-value)
-                           (set-value! "")))
-            del-value! #(del-keyword value %)]
-        (html [:div.ThemeKeywordsExtra {:class (validation-state props)}
-               (label-template props)
-               (help-block-template props)
-               [:table.table.keyword-table {:class (if-not disabled "table-hover")}
-                [:tbody
-                 (for [keyword value]
-                   (do
-                     [:tr {:class (if disabled "active" (if (highlight (:value keyword)) "highlight"))}
-                      [:td (:value keyword)]
-                      (if-not disabled
-                        [:td
-                         [:button.btn.btn-warn.btn-xs.pull-right
-                          {:on-click #(del-value! (:value keyword))}
-                          [:span.glyphicon.glyphicon-minus]]])]))]]
-               (if-not disabled
-                 [:div
-                  (om/build Input {:placeholder placeholder
-                                   :value       new-value
-                                   :on-change   #(set-value! (.. % -target -value))
-                                   :on-key-down #(match [(.-key %)]
-                                                        ["Enter"] (add-value!)
-                                                        :else nil)
-                                   :addon-after (html [:span.input-group-btn
-                                                       [:button.btn.btn-primary
-                                                        {:on-click add-value!}
-                                                        [:span.glyphicon.glyphicon-plus]]])})])])))))
-
-(defn TaxonKeywordsExtra [_ owner]
-  (reify
-    om/IDisplayName (display-name [_] "TaxonKeywordsExtra")
-    om/IInitState (init-state [_] {:new-value ""
-                                   :highlight #{}})
-    om/IRenderState
-    (render-state [_ {:keys [new-value highlight]}]
-      (let [{:keys [value required placeholder disabled] :as props} (observe-path owner [:form :fields :identificationInfo :keywordsTaxonExtra :keywords])
-            set-value! #(om/set-state! owner :new-value %)
-            add-value! #(when-not (empty? new-value)
-                         (add-keyword value new-value)
-                         (handle-highlight-new owner new-value)
-                         (set-value! nil))
-            del-value! #(del-keyword value %)]
-        (html [:div.TaxonKeywordsExtra {:class (validation-state props)}
-               [:label "Taxon keywords" (if required " *")]
-               (help-block-template props)
-               [:table.table.keyword-table {:class (if-not disabled "table-hover")}
-                [:tbody
-                 (for [keyword value]
-                   (do
-                     [:tr {:class (if disabled "active" (if (highlight (:value keyword)) "highlight"))}
-                      [:td (:value keyword)]
-                      (if-not disabled
-                        [:td [:button.btn.btn-warn.btn-xs.pull-right
-                              {:on-click #(del-value! (:value keyword))}
-                              [:span.glyphicon.glyphicon-minus]]])]))]]
-               (if-not disabled
-                 [:div
-                  (om/build Input {:placeholder placeholder
-                                   :value       new-value
-                                   :on-change   #(set-value! (.. % -target -value))
-                                   :on-key-down #(match [(.-key %)]
-                                                        ["Enter"] (add-value!)
-                                                        :else nil)
-                                   :addon-after (html [:span.input-group-btn
-                                                       [:button.btn.btn-primary
-                                                        {:on-click add-value!}
-                                                        [:span.glyphicon.glyphicon-plus]]])})])])))))
 
 
 (defn geographicElement->extent

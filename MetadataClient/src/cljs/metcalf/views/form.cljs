@@ -7,12 +7,8 @@
             [metcalf.globals :refer [observe-path app-state]]
             [condense.fields :refer [Input Checkbox ExpandingTextarea validate-required-field
                                      help-block-template label-template
-                                     del-value! add-value! add-field!]]))
-
-(defn handle-highlight-new [owner item]
-  (om/set-state! owner :highlight (conj (om/get-state owner :highlight) item))
-  (go (<! (timeout 5000))
-      (om/set-state! owner :highlight (disj (om/get-state owner :highlight) item))))
+                                     del-value! add-value! add-field!]]
+            [metcalf.views.highlight :refer [handle-highlight-new]]))
 
 (defn TableInlineEdit [{:keys [ths tds-fn form field-path
                                placeholder default-field]
