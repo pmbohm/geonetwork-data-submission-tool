@@ -1,60 +1,13 @@
 (ns metcalf.core
-  (:require-macros [cljs.core.async.macros :refer [go alt! go-loop]])
-  (:require [cljs.core.async :as async :refer [put! <! alts! chan sub timeout dropping-buffer]]
-            [clojure.string :refer [blank?]]
-            [clojure.set :as set]
+  (:require [clojure.string :refer [blank?]]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [cljs.core.match :refer-macros [match]]
             [sablono.core :as html :refer-macros [html]]
-            [clojure.string :as string]
-            [clojure.walk :refer [postwalk]]
-            [ajax.core :refer [GET POST DELETE]]
-            [goog.net.Cookies :as Cookies]
-            [condense.fields :refer [Input Checkbox ExpandingTextarea validate-required-field
-                                     help-block-template label-template
-                                     del-value! add-value! add-field!]]
-            [om-tick.form :refer [is-valid? load-errors reset-form extract-data]]
-            [om-tick.field :refer [field-zipper field-edit reset-field field?]]
-            [clojure.zip :as zip :refer [zipper]]
-            [om-tick.bootstrap :refer [Select validation-state]]
-            [metcalf.logic :as logic :refer [extract-field-values]]
-            [metcalf.content :refer [contact-groups]]
-
-            [condense.utils :refer [fmap title-case keys-in
-                                    int-assoc-in map-keys vec-remove enum]]
-            cljsjs.moment
-
-            condense.watch-state
-            condense.performance
-            [condense.history :as history]
-            goog.dom
-            goog.dom.classes
-            goog.dom.ViewportSizeMonitor
-            goog.events
-            goog.events.EventType
-            goog.events.FileDropHandler
-            goog.events.FileDropHandler.EventType
-            goog.net.EventType
-            goog.net.IframeIo
-            select-om-all.core
-            select-om-all.utils
             [metcalf.routing :as router]
-            [metcalf.views.page :refer [PageView PageTabView BackButton]]
+            [metcalf.views.page :refer [PageView]]
             [metcalf.globals :refer [app-state pub-chan notif-chan ref-path observe-path]]
-            [metcalf.handlers :as handlers]
-            [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
-                                          TextareaField TextareaFieldProps CheckboxField
-                                          handle-value-change field-update! handle-checkbox-change]]
-            [metcalf.views.form :refer [TableInlineEdit DataParametersTable Lodge AddressField
-                                        OrganisationInputField ResponsiblePartyField FieldError
-                                        PageErrors]]
-            [metcalf.views.highlight :refer [handle-highlight-new]]
-            [metcalf.views.modal :refer [Modal]]
-            [metcalf.views.fields.keyword :refer [ThemeKeywords ThemeKeywordsExtra TaxonKeywordsExtra
-                                                  KeywordsThemeTable]]
-            [metcalf.views.fields.coverage :refer [GeographicCoverage VerticalCoverage]]
-            [metcalf.views.upload :refer [UploadData]]))
+            [metcalf.handlers :as handlers]))
 
 (defn LegacyIECompatibility [props owner]
   (reify
@@ -63,7 +16,6 @@
     om/IRender
     (render [_]
       (html [:div.LegacyIECompatibility
-
              [:div.row
               [:div.col-md-6.col-md-offset-3
                [:div.container.box
@@ -95,15 +47,6 @@
       (fn []
         (if (get-in @app-state [:form :dirty])
           "This will navigate away from the Data Submission Tool and all unsaved work will be lost. Are you sure you want to do this?")))
-
-(defmethod PageView "Theme"
-  [page owner]
-  (om/component
-    (html [:div.PageViewTheme.container
-           (om/build BackButton nil)
-           [:h1 "Research theme keywords"]
-           [:p.help-block "Select keyword(s) to add to record"]
-           (om/build KeywordsThemeTable nil)])))
 
 (defn main []
   (when-let [ele (.getElementById js/document "Content")]

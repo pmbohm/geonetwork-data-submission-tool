@@ -472,3 +472,12 @@
                               " " sname
                               (if freq [:span.freq " (" freq ")"])
                               ]]))])]]]]))))
+
+(defmethod PageView "Theme"
+  [page owner]
+  (om/component
+    (html [:div.PageViewTheme.container
+           (om/build BackButton nil)
+           [:h1 "Research theme keywords"]
+           [:p.help-block "Select keyword(s) to add to record"]
+           (om/build KeywordsThemeTable nil)])))
