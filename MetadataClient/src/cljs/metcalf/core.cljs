@@ -55,56 +55,6 @@
             [metcalf.views.upload :refer [UploadData]]))
 
 
-
-(defn save!
-  "Quick and dirty save function"
-  [owner & [callback]]
-  (om/set-state! owner :saving true)
-  (let [state @app-state
-        done (chan)
-        wait (async/map vector [(timeout 500) done])
-        data (-> state :form :fields extract-field-values)]
-    (go (<! wait) (om/set-state! owner :saving false))
-    (POST (get-in state [:form :url])
-          {:params          (clj->js data)
-           :format          :json
-           :response-format :json
-           :keywords?       true
-           :handler         (fn [resp]
-                              (swap! app-state
-                                     #(-> %
-                                          (assoc-in [:form :data] data)
-                                          (update-in
-                                            [:context :document] merge
-                                            (get-in resp [:form :document]))))
-                              (put! done true)
-                              (when callback (callback)))
-           :error-handler   (fn [{:keys [status failure response status-text]}]
-                              (put! done true))
-
-           :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}})))
-
-(defn submit!
-  "Submit a doc"
-  [owner event {:keys [transition_url] :as doc}]
-  (.preventDefault event)
-  (save! owner
-         (fn []
-           (om/set-state! owner :saving true)
-           (POST transition_url
-                 {:params          #js {:transition "submit"}
-                  :handler         (fn [{:keys [document] :as data}]
-                                     (swap! app-state assoc-in [:context :document] document)
-                                     (om/set-state! owner :saving false))
-                  :error-handler   (fn [{:keys [status failure response status-text] :as data}]
-                                     (om/set-state! owner :saving false)
-                                     (js/alert (str "Unable to submit: " status " " failure)))
-                  :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
-                  :format          :json
-                  :response-format :json
-                  :keywords?       true}))))
-
-
 (defn Lodge [_ owner]
   (reify
     om/IDisplayName (display-name [_] "Lodge")
@@ -133,7 +83,7 @@
 
                 [:button.btn.btn-primary.btn-lg
                  {:disabled (or has-errors? saving disabled submitted?)
-                  :on-click #(submit! owner % document)}
+                  :on-click #(handlers/submit! owner % document)}
                  (when saving
                    (list
                      [:img
@@ -739,7 +689,7 @@
                    [:span.glyphicon.glyphicon-trash]
                    " Archive"] " "
                   [:button.btn.btn-primary {:disabled (or disabled (not dirty) saving)
-                                            :on-click #(save! owner)}
+                                            :on-click #(handlers/save! owner)}
                    (cond
                      saving [:img {:src (str (:STATIC_URL urls) "metcalf/resources/public/img/saving.gif")}]
                      dirty  [:span.glyphicon.glyphicon-floppy-disk]
@@ -769,7 +719,7 @@
                                                 [:b.text-warning "*"])]]
                      [:li {:class (if (= id (get page :tab :data-identification)) "active")}
                       [:a {:style    {:cursor "pointer"}
-                           :on-click #(do #_(save!)
+                           :on-click #(do
                                        (if has-errors? (om/update! form :show-errors true))
                                        (om/update! page [:tab] id))} text]]))
                  [:div.pull-right.hidden-xs.hidden-sm
