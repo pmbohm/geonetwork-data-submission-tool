@@ -7,9 +7,9 @@
                                      del-value! add-value! add-field!]]
             [condense.utils :refer [fmap title-case keys-in int-assoc-in map-keys vec-remove enum]]
             [om-tick.bootstrap :refer [Select validation-state]]
-            [om-tick.form :refer [is-valid? load-errors reset-form extract-data]]
+            [om-tick.form :refer [is-valid? load-errors extract-data]]
             [metcalf.content :refer [contact-groups]]
-            [metcalf.globals :refer [observe-path app-state ref-path]]
+            [metcalf.globals :refer [observe-path ref-path app-state-js]]
             [metcalf.handlers :as handlers]
             [metcalf.views.widget :refer [InputField DecimalField DateField SelectField AutoCompleteField
                                           TextareaField TextareaFieldProps CheckboxField
@@ -41,7 +41,7 @@
       (let [page (observe-path owner [:page])
             back (:back page)]
         (html (if back [:button.btn.btn-default.BackButton
-                        {:on-click #(swap! app-state assoc :page (into {} back))}
+                        {:on-click handlers/back!}
                         [:span.glyphicon.glyphicon-chevron-left] " Back"]))))))
 
 (defn NavbarHeader [props owner]
@@ -76,7 +76,7 @@
                [:div.container
                 (om/build NavbarHeader nil)
                 [:ul.nav.navbar-nav.navbar-right
-                 [:li [:a {:on-click #(swap! app-state update :form reset-form)
+                 [:li [:a {:on-click handlers/reset-form!
                            :title    "Reset form (for testing)"}
                        [:span.glyphicon.glyphicon-fire]
                        " "]]
@@ -115,10 +115,9 @@
 (defmethod PageView "404"
   [page owner]
   (om/component
-    (.log js/console "App State is" (clj->js @app-state))
+    (.log js/console "App State is" (app-state-js))
     (dom/div nil
-             (dom/h1 nil "Page not found: " (get page :name))
-             (dom/pre nil (.stringify js/JSON (clj->js @app-state) nil "  ")))))
+             (dom/h1 nil "Page not found: " (get page :name)))))
 
 (defmethod PageView "Error"
   [{:keys [text code detail]} owner]

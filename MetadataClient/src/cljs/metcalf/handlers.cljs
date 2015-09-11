@@ -184,3 +184,9 @@
   (if (contains? status-filter status)
     (om/update! page-ref :status-filter (disj status-filter status))
     (om/update! page-ref :status-filter (conj status-filter status))))
+
+(defn back! []
+  (swap! app-state update :page #(into {} (:back %))))
+
+(defn reset-form! []
+  (swap! app-state update :form reset-form))
