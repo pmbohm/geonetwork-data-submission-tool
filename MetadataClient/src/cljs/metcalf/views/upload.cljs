@@ -7,6 +7,7 @@
             [metcalf.globals :refer [observe-path]]
             [condense.utils :refer [map-keys]]
             goog.net.IframeIo
+            goog.net.EventType
             goog.events
             goog.events.EventType
             goog.events.FileDropHandler
@@ -15,10 +16,11 @@
             [metcalf.handlers :as handlers]))
 
 (defn upload! [owner]
+  (om/set-state! owner :uploading true)
   (let [form (om/get-node owner "upload-form")
         io (goog.net.IframeIo.)]
     (goog.events.listen
-      io goog.net.EventType.COMPLETE #(js/console.log "COMPLETE"))
+      io goog.net.EventType.COMPLETE #(om/set-state! owner :uploading false))
     (goog.events.listen
       io goog.net.EventType.SUCCESS (fn [_]
                                       (put!
@@ -90,7 +92,7 @@
     (init-state [_]
       {:reset-file-drop (chan)})
     om/IRenderState
-    (render-state [_ {:keys [file filename reset-file-drop]}]
+    (render-state [_ {:keys [file filename reset-file-drop uploading]}]
       (let [attachments (observe-path owner [:attachments])
             upload-form (observe-path owner [:upload_form])
             uff (:fields upload-form)]
@@ -141,5 +143,5 @@
                                               owner :filename name)))})]
                [:button.btn.btn-primary
                 {:on-click #(upload! owner)
-                 :disabled (when-not (not-any? string/blank? [file filename]) "disabled")}
+                 :disabled (or uploading (not-any? string/blank? [file filename]))}
                 "Upload"]])))))
