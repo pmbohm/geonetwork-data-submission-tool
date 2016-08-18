@@ -10,6 +10,10 @@ class SiteContentForm(forms.ModelForm):
 
 
 class DocumentAttachmentForm(forms.ModelForm):
+
+    def clean_name(self):
+        return self.cleaned_data['name'].replace(" ", "_")
+
     class Meta:
         model = DocumentAttachment
         fields = ('document', 'name', 'file')

@@ -22,6 +22,7 @@ INTERNAL_IPS = ["127.0.0.1"]
 ALLOWED_HOSTS = (
     'localhost',
     '.imas.utas.edu.au',
+    '.nectar.org.au',
 )
 
 MANAGERS = ADMINS
@@ -200,6 +201,11 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'backend.management.commands': {
+            'handlers': ['console', 'mail_admins'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
     }
 }
 
@@ -210,8 +216,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'DEFAULT_FILTER_BACKENDS': ('rest_framework.filters.DjangoFilterBackend',),
-    'PAGINATE_BY_PARAM': 'page_size',
+    'DEFAULT_FILTER_BACKENDS': ('rest_framework.filters.DjangoFilterBackend',
+                                'rest_framework.filters.SearchFilter',),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 10000,
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.BrowsableAPIRenderer',
         'rest_framework.renderers.JSONRenderer',

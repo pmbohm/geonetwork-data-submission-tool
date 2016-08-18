@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 {% load bootstrap3 %}
 {% load staticfiles %}
+{% load gitrev %}
 
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -9,6 +10,7 @@
 
     <title>{% block head_title %}{{request.site.sitecontent.title}} {{request.site.sitecontent.tag_line}}{% endblock %}</title>
     {% bootstrap_css %}
+
     <link rel="stylesheet" href="{% static 'metcalf/resources/public/css/pikaday.css' %}">
     <link rel="stylesheet" href="{% static 'metcalf/resources/public/css/ol.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'metcalf/resources/public/css/style.css' %}">
@@ -24,9 +26,17 @@
     <script type="text/javascript" src="{% static 'polyfills/console-polyfill.js' %}"></script>
     <![endif]-->
 
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBQubjVlgI8dM9HflfvYBocoNTUVUgSpV0&libraries=drawing"
+            async defer></script>
+
+
+	{% bootstrap_javascript jquery=1 %}
+
 
     <style>
     </style>
+
+    <!-- Version: {% gitrev %} -->
 </head>
 <body class="{% block body_class %}{% endblock %}">
 

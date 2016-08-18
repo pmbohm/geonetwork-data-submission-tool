@@ -1,8 +1,55 @@
 import datetime
+import os
 
 import re
 
+
+def massage_version_number(s):
+    """
+    Version number captured is of format "version-1-1"
+    Version required is "1.1"
+    """
+    re_version = "version-([-\d]+)"
+    if re.match(re_version, s):
+        version_chunk = re.search(re_version, s).group(1)
+        version_number = re.sub("-", ".", version_chunk)
+        return version_number
+
+
+def generate_attachment_url(env, fname):
+    uuid = env['uuid']
+    return "file.disclaimer?uuid={0}&fname={1}&access=private".format(uuid, fname)
+
+
 NIL_ATTR = '{http://www.isotc211.org/2005/gco}nilReason'
+
+DP_TERM_NODES = {
+    'term': {
+        'xpath': 'mcp:term'
+    },
+    'vocabularyTermURL': {
+        'xpath': 'mcp:vocabularyTermURL'
+    },
+    'vocabularyVersion': {
+        'xpath': 'mcp:vocabularyVersion',
+        'attributes': {'text': massage_version_number}
+    },
+    'termDefinition': {
+        'xpath': 'mcp:termDefinition'
+    }
+}
+
+def new_term_vocab_prune(data, parent, spec, nsmap, i, silent):
+    """
+    In case of a new term we need to prune some XML chunks from the template.
+
+    NOTE: this is a late change so we're doing something safe but ugly.
+    """
+    if data['vocabularyTermURL']: return
+
+    for xpath in ['mcp:vocabularyServiceURL', 'mcp:vocabularyPublisher', 'mcp:vocabularyTermPublisher']:
+        for elem in parent.xpath(xpath, namespaces=nsmap):
+            elem.getparent().remove(elem)
 
 CI_RESPONSIBLE_PARTY_NODES = {
     'individualName': {
@@ -46,7 +93,6 @@ CI_RESPONSIBLE_PARTY_NODES = {
         'required': False
     },
 }
-
 
 # Lookup of spec fragments, keyed by the creativeCommons data key,
 # that will be inserted into the spec at that same point and
@@ -124,28 +170,64 @@ LICENCE_SPEC = {
             'data': 'Attribution-NonCommercial 3.0 Australia'
         },
     },
+    'http://creativecommons.org/licenses/by/4.0/': {
+        'licenseLink': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:licenseLink',
+            'data': 'http://creativecommons.org/licenses/by/4.0/'
+        },
+        'jurisdictionLink': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:jurisdictionLink',
+            'data': 'http://creativecommons.org/international/'
+        },
+        'imageLink': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:imageLink',
+            'data': 'http://i.creativecommons.org/l/by/4.0/88x31.png'
+        },
+        'licenseName': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:licenseName',
+            'data': 'Attribution 4.0 International'
+        },
+    },
+    'http://creativecommons.org/licenses/by-nc/4.0/': {
+        'licenseLink': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:licenseLink',
+            'data': 'http://creativecommons.org/licenses/by-nc/4.0/'
+        },
+        'jurisdictionLink': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:jurisdictionLink',
+            'data': 'http://creativecommons.org/international/'
+        },
+        'imageLink': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:imageLink',
+            'data': 'http://i.creativecommons.org/l/by-nc/4.0/88x31.png'
+        },
+        'licenseName': {
+            'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:licenseName',
+            'data': 'Attribution-NonCommercial 4.0 International'
+        },
+    },
     # FIXME fake link to identify "Other" licensing, should be corrected by Data Manager anyway after export
     # as noted by customer:
     # We'd like to encourage people to use the first or second option,
-    # but if they choose "other constraints" that will allow the Data Manger to follow up with the user
+    # but if they choose "other constraints" that will allow the Data Manager to follow up with the user
     # to find out what other constraints they require (rather than clogging up the tool with a heap of options
     # that most people won't understand anyway).
     'http://creativecommons.org/licenses/other': {
         'licenseLink': {
             'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:licenseLink',
-            'data': 'http://creativecommons.org/licenses/other'
+            'data': 'http://creativecommons.org/licenses/by/4.0/'
         },
         'jurisdictionLink': {
             'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:jurisdictionLink',
-            'data': 'http://creativecommons.org/international/au/'
+            'data': 'http://creativecommons.org/international/'
         },
         'imageLink': {
             'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:imageLink',
-            'data': 'http://i.creativecommons.org/l/by/2.5/au/88x31.png'
+            'data': 'http://i.creativecommons.org/l/by/4.0/88x31.png'
         },
         'licenseName': {
             'xpath': 'gmd:resourceConstraints/mcp:MD_Commons/mcp:licenseName',
-            'data': 'Attribution 2.5 Australia'
+            'data': 'Attribution 4.0 International'
         },
     },
 }
@@ -168,14 +250,88 @@ def make_spec(**kwargs):
         },
         'xpath': '/mcp:MD_Metadata',
         'nodes': {
+            # Fake node so we can pass some additional metadata as payload
+            'noteForDataManager': {
+                'xpath': 'noteForDataManager',
+                'default': '',
+                'export': False
+            },
             'fileIdentifier': {
                 'xpath': 'gmd:fileIdentifier',
                 'keep': False,
                 'exportTo': [[{'xpath': 'gmd:distributionInfo/gmd:MD_Distribution/gmd:transferOptions/'
-                                        'gmd:MD_DigitalTransferOptions/gmd:onLine/gmd:CI_OnlineResource/'
-                                        'gmd:linkage/gmd:URL',
+                                        'gmd:MD_DigitalTransferOptions/gmd:onLine/gmd:CI_OnlineResource'
+                                        '[gmd:protocol/gco:CharacterString/text()="WWW:LINK-1.0-http--metadata-URL"]'
+                                        '/gmd:linkage/gmd:URL',
                                'attributes': {'text': lambda x, y: re.sub(LINKAGE_UUID, "uuid=" + x, y)}}]],
             },
+            'dataSources': [{
+                'xpath': 'gmd:distributionInfo/gmd:MD_Distribution/gmd:transferOptions/'
+                         'gmd:MD_DigitalTransferOptions/gmd:onLine'
+                         '[gmd:CI_OnlineResource/gmd:protocol/gco:CharacterString/text()!="WWW:LINK-1.0-http--link"]'
+                         '[gmd:CI_OnlineResource/gmd:protocol/gco:CharacterString/text()!="WWW:DOWNLOAD-1.0-http--download"]',
+                'keep': False,
+                'nodes': {
+                    'description': {
+                        'label': 'Description',
+                        'xpath': 'gmd:CI_OnlineResource/gmd:description',
+                        'required': True
+                    },
+                    'url': {
+                        'label': 'URL',
+                        'xpath': 'gmd:CI_OnlineResource/gmd:linkage/gmd:URL',
+                        'required': True
+                    },
+                    'name': {
+                        'label': 'Layer',
+                        'xpath': 'gmd:CI_OnlineResource/gmd:name',
+                        'required': False,
+                    },
+                    'protocol': {
+                        'label': 'Protocol',
+                        'xpath': 'gmd:CI_OnlineResource/gmd:protocol',
+                        'required': True,
+                    },
+                },
+            }],
+            'attachments': [{
+                'xpath': 'gmd:distributionInfo/gmd:MD_Distribution/gmd:transferOptions/'
+                         'gmd:MD_DigitalTransferOptions/gmd:onLine'
+                         '[gmd:CI_OnlineResource/gmd:protocol/gco:CharacterString/text()="WWW:DOWNLOAD-1.0-http--download"]',
+                'keep': False,
+                'nodes': {
+                    'file': {
+                        'label': 'URL',
+                        'xpath': 'gmd:CI_OnlineResource/gmd:linkage/gmd:URL',
+                        'required': True,
+                        'attributes': {'text': lambda x: generate_attachment_url(kwargs, os.path.basename(x))}
+                    },
+                    'name': {
+                        'label': 'Layer',
+                        'xpath': 'gmd:CI_OnlineResource/gmd:name',
+                        'required': False,
+                        'exportTo': [{'xpath': 'gmd:CI_OnlineResource/gmd:description/gco:CharacterString',
+                                      'attributes': {'text': lambda x: os.path.basename(x)}}]
+                    },
+                },
+            }],
+            'supportingResources': [{
+                'xpath': 'gmd:distributionInfo/gmd:MD_Distribution/gmd:transferOptions/'
+                         'gmd:MD_DigitalTransferOptions/gmd:onLine'
+                         '[gmd:CI_OnlineResource/gmd:protocol/gco:CharacterString/text()="WWW:LINK-1.0-http--link"]',
+                'keep': False,
+                'nodes': {
+                    'description': {
+                        'label': 'Title',
+                        'xpath': 'gmd:CI_OnlineResource/gmd:description',
+                        'required': True
+                    },
+                    'url': {
+                        'xpath': 'gmd:CI_OnlineResource/gmd:linkage/gmd:URL',
+                        'required': True
+                    },
+                },
+            }],
             'dateStamp': {
                 'xpath': 'gmd:dateStamp',
             },
@@ -277,34 +433,40 @@ def make_spec(**kwargs):
                         'attributes': {
                             'text': lambda x: datetime.datetime.strptime(x[:10], "%Y-%m-%d").date().isoformat()}
                     },
-                    'geographicElement': [{'xpath': 'gmd:extent/gmd:EX_Extent/gmd:geographicElement/'
-                                                    'gmd:EX_GeographicBoundingBox',
-                                           'required': True,
-                                           'keep': False,
-                                           'nodes': {
-                                               'westBoundLongitude': {
-                                                   'xpath': 'gmd:westBoundLongitude',
-                                                   'required': True,
-                                                   'attributes': {'text': lambda x: str(x)},
-                                               },
-                                               'eastBoundLongitude': {
-                                                   'xpath': 'gmd:eastBoundLongitude',
-                                                   'required': True,
-                                                   'attributes': {'text': lambda x: str(x)},
-                                               },
-                                               'southBoundLatitude': {
-                                                   'xpath': 'gmd:southBoundLatitude',
-                                                   'required': True,
-                                                   'attributes': {'text': lambda x: str(x)},
-                                               },
-                                               'northBoundLatitude': {
-                                                   'xpath': 'gmd:northBoundLatitude',
-                                                   'required': True,
-                                                   'attributes': {'text': lambda x: str(x)},
-                                               },
-                                           }}],
+                    'geographicElement': {
+                        'xpath': 'gmd:extent/gmd:EX_Extent/gmd:geographicElement',
+                        'removeWhen': lambda x: not x.get('hasGeographicCoverage', True),
+                        'nodes': {
+                            'hasGeographicCoverage': {
+                                'xpath': 'count(.)>0',
+                                'export': False
+                            },
+                            'boxes': [{'xpath': 'gmd:EX_GeographicBoundingBox',
+                                       'required': True,
+                                       'keep': False,
+                                       'nodes': {
+                                           'westBoundLongitude': {
+                                               'xpath': 'gmd:westBoundLongitude',
+                                               'required': True,
+                                               'attributes': {'text': lambda x: str(x)},
+                                           },
+                                           'eastBoundLongitude': {
+                                               'xpath': 'gmd:eastBoundLongitude',
+                                               'required': True,
+                                               'attributes': {'text': lambda x: str(x)},
+                                           },
+                                           'southBoundLatitude': {
+                                               'xpath': 'gmd:southBoundLatitude',
+                                               'required': True,
+                                               'attributes': {'text': lambda x: str(x)},
+                                           },
+                                           'northBoundLatitude': {
+                                               'xpath': 'gmd:northBoundLatitude',
+                                               'required': True,
+                                               'attributes': {'text': lambda x: str(x)},
+                                           }}}]}},
                     'verticalElement': {
-                        'xpath': 'gmd:extent/gmd:EX_Extent/gmd:verticalElement/gmd:EX_VerticalExtent',
+                        'xpath': 'gmd:extent/gmd:EX_Extent/gmd:verticalElement',
                         'removeWhen': lambda x: not x.get('hasVerticalExtent', False),
                         'nodes': {
                             'hasVerticalExtent': {
@@ -313,18 +475,18 @@ def make_spec(**kwargs):
                                 'default': False,
                             },
                             'minimumValue': {
-                                'xpath': 'gmd:minimumValue',
+                                'xpath': 'gmd:EX_VerticalExtent/gmd:minimumValue',
                                 'required': True,
                             },
                             'maximumValue': {
-                                'xpath': 'gmd:maximumValue',
+                                'xpath': 'gmd:EX_VerticalExtent/gmd:maximumValue',
                                 'required': True,
                             },
                             'verticalCRS': {
-                                'xpath': 'gmd:verticalCRS/gmx:ML_VerticalCRS/gml:identifier',
+                                'xpath': 'gmd:EX_VerticalExtent/gmd:verticalCRS/gml:VerticalCRS/gml:identifier',
                                 'required': True,
                                 'exportTo': [
-                                    {'xpath': 'gmd:verticalCRS/gmx:ML_VerticalCRS/gml:name',
+                                    {'xpath': 'gmd:EX_VerticalExtent/gmd:verticalCRS/gml:VerticalCRS/gml:name',
                                      'attributes': {'text': lambda x: {'EPSG::5715': 'MSL depth',
                                                                        'EPSG::5714': 'MSL height'}.get(x)}},
                                 ]
@@ -364,9 +526,11 @@ def make_spec(**kwargs):
                     # 'xpath': 'gmd:resourceConstraints/gmd:MD_SecurityConstraints/gmd:classification'
                     # },
                     # TODO: this is another 'include chunk if true' type template inclusion
-                    'useLimitation': {
+                    'useLimitations': [{
                         'xpath': 'gmd:resourceConstraints/gmd:MD_Constraints/gmd:useLimitation',
-                    },
+                        'container': 'gmd:resourceConstraints/gmd:MD_Constraints',
+                        'keep': False,
+                    }],
                     'supplementalInformation': [
                         {
                             'xpath': 'gmd:supplementalInformation',
@@ -383,29 +547,40 @@ def make_spec(**kwargs):
                                     'xpath': 'mcp:parameterName/mcp:DP_Term'
                                              '[mcp:type/mcp:DP_TypeCode/@codeListValue="shortName"]'
                                              '/mcp:term',
-                                    'required': True,
+                                    'required': False,
                                 },
                                 'longName': {
                                     'xpath': 'mcp:parameterName/mcp:DP_Term'
-                                             '[mcp:type/mcp:DP_TypeCode/@codeListValue="longName"]'
-                                             '/mcp:term',
-                                    'required': False,
+                                             '[mcp:type/mcp:DP_TypeCode/@codeListValue="longName"]',
+                                    'nodes': DP_TERM_NODES,
+                                    'postprocess': new_term_vocab_prune
+                                    # 'required': True,
                                 },
                                 'unit': {
                                     'xpath': 'mcp:parameterUnits/mcp:DP_Term'
-                                             '[mcp:type/mcp:DP_TypeCode/@codeListValue="longName"]'
-                                             '/mcp:term',
-                                    'required': True,
+                                             '[mcp:type/mcp:DP_TypeCode/@codeListValue="longName"]',
+                                    'nodes': DP_TERM_NODES,
+                                    'postprocess': new_term_vocab_prune
                                 },
-                                'parameterMinimumValue': {
-                                    'xpath': 'mcp:parameterMinimumValue'
+                                # 'parameterMinimumValue': {
+                                #     'xpath': 'mcp:parameterMinimumValue'
+                                # },
+                                # 'parameterMaximumValue': {
+                                #     'xpath': 'mcp:parameterMaximumValue'
+                                # },
+                                # 'parameterDescription': {
+                                #     'xpath': 'mcp:parameterDescription'
+                                # },
+                                'instrument': {
+                                    'xpath': 'mcp:parameterDeterminationInstrument/mcp:DP_Term',
+                                    'nodes': DP_TERM_NODES,
+                                    'postprocess': new_term_vocab_prune
                                 },
-                                'parameterMaximumValue': {
-                                    'xpath': 'mcp:parameterMaximumValue'
-                                },
-                                'parameterDescription': {
-                                    'xpath': 'mcp:parameterDescription'
-                                },
+                                'platform': {
+                                    'xpath': 'mcp:platform/mcp:DP_Term',
+                                    'nodes': DP_TERM_NODES,
+                                    'postprocess': new_term_vocab_prune
+                                }
                             }
                         }
                     ]

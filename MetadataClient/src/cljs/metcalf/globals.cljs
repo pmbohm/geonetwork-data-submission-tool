@@ -1,26 +1,27 @@
 (ns metcalf.globals
-  (:require [cljs.core.async :as async :refer [chan pub]]
-            [om.core :as om :include-macros true]
-            [condense.derived :refer [derived-atom!]]
-            [metcalf.logic :refer [derived-state]]
-            [condense.utils :refer [memoize-last]]))
+  (:require [om.core :as om :include-macros true]
+            [metcalf.logic :refer [derived-state]]))
 
-(defonce app-state (derived-atom! (atom {}) (memoize-last derived-state)))
-(def pub-chan (chan))
-(def notif-chan (pub pub-chan :topic))
+(defonce app-db (atom {}))
+(defonce derived-db (atom {}))
+
+(add-watch
+  app-db :derive-db
+  (fn [k r o n]
+    (when-not (= o n)
+      (reset! derived-db (derived-state n)))))
 
 (defn ref-path
   "Return a ref cursor at a specified path"
   [path]
-  (let [rc (om/root-cursor app-state)]
+  (let [rc (om/root-cursor derived-db)]
     (assert (get-in rc path) (str "No value found in app-state at: " path))
     (-> rc (get-in path) om/ref-cursor)))
 
 (defn observe-path
   "Observes and returns a reference cursor at path and it's value including any derived state."
-  [owner path]
-  {:pre [(om/component? owner)]}
-  (om/observe owner (ref-path path)))
-
-(defn ^:export app-state-js []
-  (clj->js @app-state))
+  ([owner]
+   (om/observe owner (om/ref-cursor (om/root-cursor derived-db))))
+  ([owner path]
+   {:pre [(om/component? owner)]}
+   (om/observe owner (ref-path path))))

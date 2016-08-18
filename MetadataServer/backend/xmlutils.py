@@ -9,7 +9,7 @@ from django.utils.six import string_types
 logger = logging.getLogger(__name__)
 
 SPECIAL_KEYS = ['namespaces', 'nodes', 'xpath', 'export', 'attributes', 'container', 'parser', 'exportTo', 'keep',
-                'default', 'removeWhen', 'template']
+                'default', 'removeWhen', 'template', 'postprocess']
 
 
 def get_value_type(eles):
@@ -192,6 +192,7 @@ def spec_data_from_batch(batch_spec, key):
 
 
 def data_to_xml(data, parent, spec, nsmap, i=0, silent=True):
+
     if isinstance(spec, list):
         spec = spec[0]
         xpath = spec.get('container', spec['xpath'])
@@ -209,11 +210,12 @@ def data_to_xml(data, parent, spec, nsmap, i=0, silent=True):
                 else:
                     raise Exception(msg)
             mount = container[0].getparent()
+            index = mount.index(container[0])
             template = deepcopy(container[0])
             for elem in container:
                 mount.remove(elem)
             for i, item in enumerate(data):
-                mount.append(deepcopy(template))
+                mount.insert(index + i, deepcopy(template))
                 data_to_xml(item, parent, spec, nsmap, i, silent)
     elif not spec.get('export', True):
         if 'exportTo' in spec:
@@ -274,3 +276,6 @@ def data_to_xml(data, parent, spec, nsmap, i=0, silent=True):
                 if isinstance(v, list):
                     v[0]['fanout'] = True
                 data_to_xml(data, parent, v, nsmap, i, silent)
+
+    if 'postprocess' in spec:
+        spec['postprocess'](data, parent, spec, nsmap, i, silent)

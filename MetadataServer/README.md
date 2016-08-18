@@ -12,6 +12,25 @@ python manage.py syncdb
 python manage.py runserver
 ```
 
+Additional steps when setting up locally:
+
+### Load fixtures
+```
+python manage.py loaddata backend\fixtures\sciencekeywords.json
+```
+
+### Load external sources
+```
+python manage.py load_parameterunits
+python manage.py load_parameterplatforms
+python manage.py load_parameternames
+python manage.py load_parameterinstruments
+python manage.py load_institutions
+python manage.py load_rolecodes
+```
+
+---
+
 For production you'll want to add a `webapp/local_settings.py` and configure a 
 different database, static file hosting details etc.
 

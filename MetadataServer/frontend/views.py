@@ -1,32 +1,33 @@
 # from frontend.router import rest_serialize
-from django.contrib import messages
-from django.contrib.auth.models import User
+import os
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, render_to_response, render
+from django.template.context_processors import csrf
 from django_fsm import has_transition_perm
+from lxml import etree
 from rest_framework import serializers
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.response import Response
-from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
 from rest_framework.views import APIView
-from lxml import etree
-from django.shortcuts import get_object_or_404, render_to_response
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
-from django.template.context_processors import csrf
+from tempfile import TemporaryFile
+from zipfile import ZipFile, ZipInfo
 
-from backend.models import Institution, DraftMetadata, Document, DocumentAttachment, ScienceKeyword, MetadataTemplate
+from backend.models import DraftMetadata, Document, DocumentAttachment, ScienceKeyword, MetadataTemplate
+from backend.spec_2_0 import *
 from backend.utils import to_json
+from backend.xmlutils import extract_fields, data_to_xml
 from frontend.forms import DocumentAttachmentForm
 from frontend.models import SiteContent
 from frontend.permissions import is_document_editor
-from backend.xmlutils import extract_xml_data, extract_fields, data_to_xml
-from backend.spec_2_0 import *
-
-spec = make_spec(science_keyword=ScienceKeyword)
 
 
 def theme_keywords():
@@ -87,6 +88,7 @@ class DocumentInfoSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     clone_url = serializers.SerializerMethodField()
     transition_url = serializers.SerializerMethodField()
+    export_url = serializers.SerializerMethodField()
     last_updated = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     transitions = serializers.SerializerMethodField()
@@ -94,7 +96,7 @@ class DocumentInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = ('uuid', 'title', 'owner', 'last_updated',
-                  'url', 'clone_url', 'transition_url',
+                  'url', 'clone_url', 'transition_url', 'export_url',
                   'status', 'transitions')
 
     def get_url(self, doc):
@@ -105,6 +107,9 @@ class DocumentInfoSerializer(serializers.ModelSerializer):
 
     def get_clone_url(self, doc):
         return reverse("Clone", kwargs={'uuid': doc.uuid})
+
+    def get_export_url(self, doc):
+        return reverse("Export", kwargs={'uuid': doc.uuid})
 
     def get_last_updated(self, doc):
         drafts = doc.draftmetadata_set
@@ -121,10 +126,14 @@ class DocumentInfoSerializer(serializers.ModelSerializer):
 
 class AttachmentSerializer(serializers.ModelSerializer):
     delete_url = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
 
     class Meta:
         model = DocumentAttachment
         fields = ('id', 'name', 'file', 'created', 'modified', 'delete_url')
+
+    def get_name(self, inst):
+        return inst.file.name
 
     def get_delete_url(self, inst):
         return reverse("DeleteAttachment", kwargs={'uuid': inst.document.uuid, 'id': inst.id})
@@ -149,14 +158,14 @@ def user_status_list():
 
 
 @login_required
-@api_view()
 def dashboard(request):
     docs = (Document.objects
             .filter(owner=request.user)
             .exclude(status=Document.DISCARDED))
-    return Response({
+    payload = JSONRenderer().render({
         "context": {
             "urls": master_urls(),
+            "URL_ROOT": settings.FORCE_SCRIPT_NAME or "",
             "site": site_content(request.site),
             "user": UserSerializer(request.user).data,
             "documents": DocumentInfoSerializer(docs, many=True, context={'user': request.user}).data,
@@ -169,7 +178,7 @@ def dashboard(request):
                     "label": "Document title",
                     "initial": "Untitled",
                     "value": "",
-                    "required": True
+                    "required": False
                 },
                 "template": {
                     "label": "Template",
@@ -182,24 +191,22 @@ def dashboard(request):
         },
         "messages": messages_payload(request),
         "page": {"name": request.resolver_match.url_name}})
+    return render(request, "app.html", {"payload": payload})
 
 
 @login_required
 @api_view(['POST'])
 def create(request):
+
     template = get_object_or_404(
         MetadataTemplate, site=request.site, archived=False, pk=request.data['template'])
     try:
-        tree = etree.parse(template.file.path)
-        doc = Document.objects.create(title=request.data['title'],
-                                      owner=request.user,
-                                      template=template)
-        data = extract_xml_data(tree, spec)
-        data['identificationInfo']['title'] = request.data['title']
-        data['fileIdentifier'] = doc.pk
-        DraftMetadata.objects.create(document=doc,
-                                     user=request.user,
-                                     data=JSONRenderer().render(data))
+        
+        doc = Document(title=request.data['title'],
+                       owner=request.user,
+                       template=template)
+        doc.save()
+                                      
         return Response({"message": "Created",
                          "document": DocumentInfoSerializer(doc, context={'user': request.user}).data})
     except AssertionError as e:
@@ -225,10 +232,71 @@ def clone(request, uuid):
 def export(request, uuid):
     doc = get_object_or_404(Document, uuid=uuid)
     is_document_editor(request, doc)
-    data = to_json(doc.draftmetadata_set.all()[0].data)
+    data = to_json(doc.latest_draft.data)
     xml = etree.parse(doc.template.file.path)
+    spec = make_spec(science_keyword=ScienceKeyword, uuid=uuid)
     data_to_xml(data, xml, spec, spec['namespaces'])
-    return HttpResponse(etree.tostring(xml), content_type="application/xml")
+    response = HttpResponse(etree.tostring(xml), content_type="application/xml")
+    if "download" in request.GET:
+        response['Content-Disposition'] = 'attachment; filename="{}.xml"'.format(uuid)
+    return response
+
+
+MEF_TEMPLATE = '''<?xml version="1.0" encoding="UTF-8"?>
+<info version="1.1">
+  <general>
+    <createDate></createDate>
+    <changeDate></changeDate>
+    <schema>iso19139.mcp</schema>
+    <isTemplate>false</isTemplate>
+    <format>full</format>
+    <uuid></uuid>
+  </general>
+  <categories />
+  <privileges>
+    <group name="all">
+      <operation name="view" />
+      <operation name="download" />
+    </group>
+  </privileges>
+  <public />
+</info>
+'''
+
+
+@login_required
+def mef(request, uuid):
+    doc = get_object_or_404(Document, uuid=uuid)
+    is_document_editor(request, doc)
+    data = to_json(doc.latest_draft.data)
+    xml = etree.parse(doc.template.file.path)
+    spec = make_spec(science_keyword=ScienceKeyword, uuid=uuid)
+    data_to_xml(data, xml, spec, spec['namespaces'])
+    response = HttpResponse(content_type="application/x-mef")
+    response['Content-Disposition'] = 'attachment; filename="{}.mef"'.format(uuid)
+    info = etree.fromstring(MEF_TEMPLATE)
+    now = datetime.datetime.now().isoformat()
+    info.xpath('/info/general/createDate')[0].text = now
+    info.xpath('/info/general/changeDate')[0].text = now
+    info.xpath('/info/general/uuid')[0].text = uuid
+    private = etree.SubElement(info, "private")
+    # NOTE we can't write directly to `response` (i.e. ZipFile(response, 'w'))
+    # because it doesn't support `seek`, required by ZipFile.write
+    tmp = TemporaryFile()
+    with ZipFile(tmp, 'w') as z:
+        z.writestr('metadata.xml', etree.tostring(xml))
+        z.writestr(ZipInfo('public/'), '')
+        z.writestr(ZipInfo('private/'), '')
+        for attachment in doc.attachments.all():
+            name = os.path.basename(attachment.file.name)
+            z.write(attachment.file.path, 'private/' + name)
+            etree.SubElement(private, "file", name=name, changeDate=attachment.modified.isoformat())
+        z.writestr('info.xml', etree.tostring(info))
+        z.close()
+        tmp.seek(0)
+        response.write(tmp.read())
+        tmp.close()
+    return response
 
 
 def home(request):
@@ -237,33 +305,54 @@ def home(request):
 
 
 @login_required
-@api_view(['GET', 'POST'])
-def edit(request, uuid):
+@api_view(['POST'])
+def save(request, uuid):
     doc = get_object_or_404(Document, uuid=uuid)
     is_document_editor(request, doc)
-
-    if request.method == 'POST':
-        doc.title = request.data['identificationInfo']['title'] or "Untitled"
+    spec = make_spec(science_keyword=ScienceKeyword, uuid=uuid)
+    try:
+        data = request.data
+        doc.title = data['identificationInfo']['title'] or "Untitled"
         if (doc.status == doc.SUBMITTED):
             doc.resubmit()
         doc.save()
-        inst = DraftMetadata.objects.create(document=doc, user=request.user, data=request.data)
+        inst = DraftMetadata.objects.create(document=doc, user=request.user, data=data)
+        inst.noteForDataManager = data['noteForDataManager'] or ''
+        inst.save()
+        
+        # Remove any attachments which are no longer mentioned in the XML.
+        xml_names = map(lambda x: os.path.basename(x['file']), data['attachments'])
+        for attachment in doc.attachments.all():
+            name = os.path.basename(attachment.file.url)
+            if name not in xml_names:
+                attachment.delete()
+        
         tree = etree.parse(doc.template.file.path)
         return Response({"messages": messages_payload(request),
                          "form": {
                              "url": reverse("Edit", kwargs={'uuid': doc.uuid}),
                              "fields": extract_fields(tree, spec),
-                             "data": to_json(inst.data),
+                             "data": data,
                              "document": DocumentInfoSerializer(doc, context={'user': request.user}).data}})
+    except RuntimeError as e:
+        return Response({"message": e.message, "args": e.args}, status=400)
+
+
+@login_required
+def edit(request, uuid):
+    doc = get_object_or_404(Document, uuid=uuid)
+    is_document_editor(request, doc)
+    spec = make_spec(science_keyword=ScienceKeyword, uuid=uuid)
 
     draft = doc.draftmetadata_set.all()[0]
     data = to_json(draft.data)
     tree = etree.parse(doc.template.file.path)
 
-    return Response({
+    payload = JSONRenderer().render({
         "context": {
             "site": site_content(request.site),
             "urls": master_urls(),
+            "URL_ROOT": settings.FORCE_SCRIPT_NAME or "",
             "uuid": doc.uuid,
             "user": UserSerializer(request.user).data,
             "title": data['identificationInfo']['title'],
@@ -271,7 +360,7 @@ def edit(request, uuid):
             "status": user_status_list()
         },
         "form": {
-            "url": reverse("Edit", kwargs={'uuid': doc.uuid}),
+            "url": reverse("Save", kwargs={'uuid': doc.uuid}),
             "fields": extract_fields(tree, spec),
             "data": data,
         },
@@ -301,16 +390,17 @@ def edit(request, uuid):
         "data": data,
         "attachments": AttachmentSerializer(doc.attachments.all(), many=True).data,
         "theme": {"table": theme_keywords()},
-        "institutions": [inst.to_dict() for inst in Institution.objects.all()],
+        # "institutions": [inst.to_dict() for inst in Institution.objects.all()],
         "page": {"name": request.resolver_match.url_name}})
+    return render(request, "app.html", {"payload": payload})
 
 
-@api_view()
 def theme(request):
     "Stand alone endpoint for looking at themes.  Not required for production UI."
-    return Response({
+    payload = JSONRenderer().render({
         "theme": theme_keywords(),
         "page": {"name": request.resolver_match.url_name}})
+    return render(request, "app.html", {"payload": payload})
 
 
 class UploadView(APIView):

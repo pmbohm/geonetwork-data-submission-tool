@@ -1,268 +1,338 @@
 (ns metcalf.handlers
-  (:require-macros [cljs.core.async.macros :refer [go alt! go-loop]])
-  (:require [om-tick.form :as form]
+  (:require [clojure.string :as str]
+            [cljs.core.async :as async :refer [put!]]
             [ajax.core :refer [GET POST DELETE]]
-            [cljs.core.async :as async :refer [put! <! alts! chan sub timeout dropping-buffer]]
-            [om.core :as om :include-macros true]
-            [om-tick.form :refer [is-valid? load-errors reset-form extract-data]]
-            [condense.utils :refer [vec-remove]]
-            [metcalf.logic :as logic :refer [extract-field-values]]
-            [metcalf.globals :refer [observe-path app-state ref-path]]
-            [tailrecursion.priority-map :refer [priority-map]]
-            [metcalf.utils :refer [deep-merge]]
-            [metcalf.content :refer [default-payload]]
-            [metcalf.logic :as logic]
-            [metcalf.content :refer [contact-groups]]
-            [metcalf.utils :refer [reverse-or]]
-            goog.net.Cookies))
+            [om.core :as om]
+            [metcalf.utils :refer [vec-remove js-lookup error warn log info debug]]
+            [metcalf.globals :refer [ref-path app-db]]
+            [metcalf.logic :as logic :refer [extract-field-values field-edit reset-field field-zipper]]
+            [goog.net.XhrIo :as xhrio]
+            [goog.object :as gobj])
+  (:import [goog.net Cookies]))
 
-(defn init-theme-options [{:keys [table] :as theme}]
-  (assoc theme :options (into (priority-map) (map logic/theme-option table))))
+(defn load-api-options [api-path]
+  (let [{:keys [uri options]} (get-in @app-db api-path)]
+    (when (nil? options)
+      (xhrio/send uri (fn [e]
+                        (let [json (.. e -target getResponseJson)
+                              results (gobj/get json "results")]
+                          (swap! app-db update-in api-path assoc :options results)))))))
 
-(defn initialise-form
-  ([{:keys [data] :as form}]
-   (initialise-form form data))
-  ([form data]
-   (-> (form/reset-form form)
-       (assoc :data data)
-       (update :fields logic/reduce-many-field-templates data)
-       (update :fields logic/reduce-field-values data))))
+(defn transact!
+  "Act like om/transact! but actually swap against app-db.  Work around for app-db -> app-state behavior."
+  ([cursor f]
+   (transact! cursor [] f nil))
+  ([cursor korks f]
+   (transact! cursor korks f nil))
+  ([cursor korks f tag]
+   (let [path (om/path cursor)
+         korks (cond
+                 (nil? korks) []
+                 (sequential? korks) korks
+                 :else [korks])]
+     (swap! app-db
+            update-in path
+            update-in korks
+            f))))
 
-(defn initial-state
-  "Massage raw payload for use as app-state"
-  [payload]
-  (-> (deep-merge default-payload payload)
-      (update :form initialise-form)
-      (update :theme init-theme-options)))
+(defn update!
+  "Act like om/update! but actually swap against app-db.  Work around for app-db -> app-state behavior."
+  ([cursor v]
+   (transact! cursor [] (fn [_] v) nil))
+  ([cursor korks v]
+   (transact! cursor korks (fn [_] v) nil))
+  ([cursor korks v tag]
+   (transact! cursor korks (fn [_] v) tag)))
 
-(defn save!
-  "Quick and dirty save function"
-  [owner & [callback]]
-  (om/set-state! owner :saving true)
-  (let [state @app-state
-        done (chan)
-        wait (async/map vector [(timeout 500) done])
+(defn close-modal []
+  (swap! app-db update :alert pop))
+
+(defn open-modal [props]
+  (swap! app-db update :alert
+         (fn [alerts]
+           (when-not (= (peek alerts) props)
+             (conj alerts props)))))
+
+(defn del-value!
+  "Helper to delete a value from a list field by index
+   which assumes the standard :many field conventions"
+  [many-field i]
+  (transact! many-field :value #(vec-remove % i)))
+
+(defn new-value-field
+  [many-field]
+  ; TODO: use field-postwalk to avoid inefficiencies with long options lists
+  (let [fields (:fields (om/value many-field))]
+    {:value (field-edit (field-zipper fields) reset-field)}))
+
+(defn add-field!
+  ([many-field]
+   (let [new-field (new-value-field many-field)]
+     (add-field! many-field new-field)))
+  ([many-field field]
+   (transact! many-field :value #(conj % (om/value field)))))
+
+(defn add-value!
+  "Helper to append a new value to a many-field.
+
+  * Initialise new field map based on :fields
+  * Load any data provided
+  "
+  [many-field value]
+  (add-field! many-field (-> (new-value-field many-field)
+                             (assoc :value (om/value value)))))
+
+(defn delete-attachment
+  [attachments-ref attachment]
+  {:pre [(om/cursor? attachments-ref)
+         (om/cursor? attachment)]}
+  (del-value! attachments-ref (last (om/path attachment)))
+  #_
+  (let [delete_url (-> attachment :value :delete_url :value)]
+    (DELETE delete_url
+            {:handler         (fn [data]
+                                (del-value! attachments-ref (last (om/path attachment))))
+             :error-handler   (fn [data]
+                                (open-modal {:type :alert :message "Unable to delete file"}))
+             :headers         {"X-CSRFToken" (.get (Cookies. js/document) "csrftoken")}
+             :format          :json
+             :response-format :json
+             :keywords?       true})))
+
+(defn create-document
+  [url form result-ch]
+  (POST url
+        {:params          (logic/extract-data form)
+         :format          :json
+         :response-format :json
+         :keywords?       true
+         :handler         (fn [data]
+                            (put! result-ch {:success true :data data}))
+         :error-handler   (fn [data]
+                            (put! result-ch {:success false :data data}))
+         :headers         {"X-CSRFToken" (.get (Cookies. js/document) "csrftoken")}}))
+
+(defn clone-document
+  "docstring"
+  [url]
+  (POST url {:handler         #(aset js/location "href" (get-in % [:document :url]))
+             :error-handler   (fn [{:keys [status failure response status-text] :as data}]
+                                (open-modal {:type :alert :message "Unable to clone"}))
+             :headers         {"X-CSRFToken" (.get (Cookies. js/document) "csrftoken")}
+             :format          :json
+             :response-format :json
+             :keywords?       true}))
+
+(defn transition-current-document
+  [url transition on-error]
+  (POST url {:handler         (fn [{{:keys [uuid] :as doc} :document}]
+                                (swap! app-db update-in [:context :documents]
+                                       (fn [docs]
+                                         (reduce #(if (= uuid (:uuid %2))
+                                                   (if (= transition "delete_archived")
+                                                     %1
+                                                     (conj %1 doc))
+                                                   (conj %1 %2))
+                                                 [] docs))))
+             :error-handler   on-error
+             :headers         {"X-CSRFToken" (.get (Cookies. js/document) "csrftoken")}
+             :params          #js {:transition transition}
+             :format          :json
+             :response-format :json
+             :keywords?       true}))
+
+(defn submit-current-document
+  [transition_url on-success on-error]
+  (POST transition_url
+        {:params          #js {:transition "submit"}
+         :handler         (fn [{:keys [document] :as data}]
+                            (swap! app-db assoc-in [:context :document] document)
+                            (on-success))
+         :error-handler   (fn [data]
+                            (on-error data))
+         :headers         {"X-CSRFToken" (.get (Cookies. js/document) "csrftoken")}
+         :format          :json
+         :response-format :json
+         :keywords?       true}))
+
+(defn save-current-document
+  [done-ch callback]
+  (let [state @app-db
         data (-> state :form :fields extract-field-values)]
-    (go (<! wait) (om/set-state! owner :saving false))
     (POST (get-in state [:form :url])
           {:params          (clj->js data)
            :format          :json
            :response-format :json
            :keywords?       true
            :handler         (fn [resp]
-                              (swap! app-state
+                              (swap! app-db
                                      #(-> %
                                           (assoc-in [:form :data] data)
                                           (update-in
                                             [:context :document] merge
                                             (get-in resp [:form :document]))))
-                              (put! done true)
+                              (put! done-ch true)
                               (when callback (callback)))
            :error-handler   (fn [{:keys [status failure response status-text]}]
-                              (put! done true))
+                              (put! done-ch true))
 
-           :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}})))
+           :headers         {"X-CSRFToken" (.get (Cookies. js/document) "csrftoken")}})))
 
-(defn submit!
-  "Submit a doc"
-  [owner event {:keys [transition_url] :as doc}]
-  (.preventDefault event)
-  (save! owner
-         (fn []
-           (om/set-state! owner :saving true)
-           (POST transition_url
-                 {:params          #js {:transition "submit"}
-                  :handler         (fn [{:keys [document] :as data}]
-                                     (swap! app-state assoc-in [:context :document] document)
-                                     (om/set-state! owner :saving false))
-                  :error-handler   (fn [{:keys [status failure response status-text] :as data}]
-                                     (om/set-state! owner :saving false)
-                                     (js/alert (str "Unable to submit: " status " " failure)))
-                  :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
-                  :format          :json
-                  :response-format :json
-                  :keywords?       true}))))
+(defn add-attachment
+  [attachment-data]
+  (let [data (select-keys attachment-data [:file :name :delete_url])
+        attachments-ref (ref-path [:form :fields :attachments])
+        template (om/value (:fields attachments-ref))
+        new-value (reduce (fn [form-acc [k v]]
+                            (assoc-in form-acc [k :value] v))
+                          template data)]
+    (swap! app-db update-in [:form :fields :attachments :value]
+           conj {:value new-value})))
 
-(defn archive!
+(defn archive-current-document
   "Quick and dirty delete function"
-  [owner]
-  (if (js/confirm "Are you sure you want to archive this record?")
-    (let [state @app-state
-          transition_url (-> state :context :document :transition_url)
-          success_url (-> state :context :urls :Dashboard)]
-      (POST transition_url {:params #js {:transition "archive"}
-                            :handler         (fn [{:keys [message document] :as data}]
-                                               (aset js/location "href" success_url))
-                            :error-handler   (fn [{:keys [status failure response status-text] :as data}]
-                                               (js/alert "Unable to delete"))
-                            :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
-                            :format          :json
-                            :response-format :json
-                            :keywords?       true}))))
+  []
+  (let [state @app-db
+        transition_url (-> state :context :document :transition_url)
+        success_url (-> state :context :urls :Dashboard)]
+    (POST transition_url {:params          #js {:transition "archive"}
+                          :handler         (fn [{:keys [message document] :as data}]
+                                             (aset js/location "href" success_url))
+                          :error-handler   (fn [{:keys [status failure response status-text] :as data}]
+                                             (open-modal {:type :alert :message "Unable to delete"}))
+                          :headers         {"X-CSRFToken" (.get (Cookies. js/document) "csrftoken")}
+                          :format          :json
+                          :response-format :json
+                          :keywords?       true})))
 
-(defn delete-contact! [owner group item e]
-  (.stopPropagation e)
-  (let [parties (-> group contact-groups :path ref-path)
-        {:keys [selected-group selected-item]} (om/get-state owner)]
-    (when (js/confirm "Are you sure you want to delete this person?")
-      (when (and (= group selected-group) (<= item selected-item))
-        (om/set-state!
-          owner :selected-item (when (> (count (:value parties)) 1)
-                                 (-> selected-item dec (max 0)))))
-      (om/transact! parties #(update % :value vec-remove item)))))
+(defn back [x]
+  (swap! app-db assoc :page (into {} x)))
 
-(defn create-document-ch
-  [{:keys [url] :as form}]
-  (let [result-ch (chan)]
-    (POST url
-          {:params          (extract-data form)
-           :format          :json
-           :response-format :json
-           :keywords?       true
-           :handler         (fn [data]
-                              (put! result-ch {:success true :data data}))
-           :error-handler   (fn [data]
-                              (put! result-ch {:success false :data data}))
-           :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}})
-    result-ch))
+(defn ror
+  "Reverse OR: use it to update source value only if destination value is not falsey."
+  [a b]
+  (or b a))
 
-(defn dashboard-create-save [owner e]
-  (let [form-ref (ref-path [:create_form])
-        page-ref (ref-path [:page])]
-    (if (is-valid? form-ref)
-      (go (let [{:keys [success data]} (<! (create-document-ch (om/value form-ref)))]
-            (if success
-              (do
-                (om/transact! form-ref reset-form)
-                (om/update! form-ref :show-errors false)
-                (om/update! page-ref :show-create-modal false)
-                (aset js/location "href" (-> data :document :url)))
-              (if (= (:status data) 400)
-                (om/update! page-ref {:name   "Error"
-                                      :text   (-> data :response :message)
-                                      :code   (-> data :status)
-                                      :detail (-> data :response)})
-                (do
-                  (om/update! form-ref load-errors (:response data))
-                  (om/update! form-ref :show-errors true))))))
-      (om/update! form-ref :show-errors true))
-    nil))
+(defn update-address [contact {:strs [city organisationName deliveryPoint deliveryPoint2
+                                      postalCode country administrativeArea]
+                               :or   {city               ""
+                                      organisationName   ""
+                                      deliveryPoint      ""
+                                      deliveryPoint2     ""
+                                      postalCode         ""
+                                      country            ""
+                                      administrativeArea ""}
+                               :as   values}]
+  (swap! app-db
+         update-in (om/path contact)
+         #(-> %
+              (assoc-in [:value :organisationName :value] organisationName)
+              (update-in [:value :address :deliveryPoint :value] ror deliveryPoint)
+              (update-in [:value :address :deliveryPoint2 :value] ror deliveryPoint2)
+              (update-in [:value :address :city :value] ror city)
+              (update-in [:value :address :administrativeArea :value] ror administrativeArea)
+              (update-in [:value :address :postalCode :value] ror postalCode)
+              (update-in [:value :address :country :value] ror country))))
 
-(defn transite-doc [url transition event]
-  (let [trans-name (first (clojure.string/split transition "_"))]
-    (if (js/confirm (str "Are you sure you want to " trans-name " this record?"))
-      (POST url {:handler         (fn [{{:keys [uuid] :as doc} :document}]
-                                    (swap! app-state update-in [:context :documents]
-                                           (fn [docs]
-                                             (reduce #(if (= uuid (:uuid %2))
-                                                       (if (= transition "delete_archived")
-                                                         %1
-                                                         (conj %1 doc))
-                                                       (conj %1 %2))
-                                                     [] docs))))
-                 :error-handler   (fn [{:keys [status failure response status-text] :as data}]
-                                    (js/alert (str "Unable to " trans-name)))
-                 :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
-                 :params          #js {:transition transition}
-                 :format          :json
-                 :response-format :json
-                 :keywords?       true})))
-  (.preventDefault event))
+(defn update-dp-term
+  [dp-term-path option]
+  ; TODO: need to make option data consistent
+  (let [option (if (map? option) option (js-lookup option))
+        {:keys [term vocabularyTermURL vocabularyVersion termDefinition]} option]
+    (swap! app-db (fn [db] (-> db
+                               (update-in dp-term-path assoc-in [:term :value] term)
+                               (update-in dp-term-path assoc-in [:vocabularyTermURL :value] vocabularyTermURL)
+                               (update-in dp-term-path assoc-in [:vocabularyVersion :value] vocabularyVersion)
+                               (update-in dp-term-path assoc-in [:termDefinition :value] termDefinition))))))
 
-(defn clone-doc [url event]
-  (if (js/confirm (str "Are you sure you want to clone this record?"))
-    (POST url {:handler         #(aset js/location "href" (get-in % [:document :url]))
-               :error-handler   (fn [{:keys [status failure response status-text] :as data}]
-                                  (js/alert (str "Unable to clone")))
-               :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
-               :format          :json
-               :response-format :json
-               :keywords?       true}))
-  (.preventDefault event))
+(defn setter [cursor k v]
+  (swap! app-db update-in (om/path cursor) assoc k v))
+
+(defn unsaved-input-check-helper [{:keys [new-value errors] :as keywords-data}]
+  (assoc keywords-data
+    :errors
+    (if (str/blank? new-value)
+      (disj (set errors) "Unsaved value in the keyword input field")
+      (conj (set errors) "Unsaved value in the keyword input field"))))
+
+(defn check-unsaved-keyword-input [keywords-path]
+  (swap! app-db update-in keywords-path unsaved-input-check-helper))
+
+(defn remove-party [parties item]
+  (let [parties-path (om/path parties)]
+    (swap! app-db update-in parties-path update :value vec-remove item)))
+
+(defn reset-form
+  ([] (swap! app-db update :form reset-form))
+  ([form-ref]
+   (transact! form-ref logic/reset-form)))
+
+(defn show-errors
+  [field-cursor]
+  (update! field-cursor :show-errors true))
+
+(defn hide-errors
+  [form]
+  (update! form :show-errors false))
+
+(defn show-create-modal []
+  (swap! app-db assoc-in [:page :show-create-modal] true))
+
+(defn hide-create-modal []
+  (swap! app-db assoc-in [:page :show-create-modal] false))
 
 (defn toggle-status-filter
   [page-ref status-filter status]
   (if (contains? status-filter status)
-    (om/update! page-ref :status-filter (disj status-filter status))
-    (om/update! page-ref :status-filter (conj status-filter status))))
+    (update! page-ref :status-filter (disj status-filter status))
+    (update! page-ref :status-filter (conj status-filter status))))
 
-(defn back! []
-  (swap! app-state update :page #(into {} (:back %))))
+(defn show-all-documents
+  [page status-freq]
+  (update! page :status-filter (set (keys status-freq))))
 
-(defn reset-form! []
-  (swap! app-state update :form reset-form))
+(defn load-error-page [data]
+  (update! (ref-path [:page])
+           {:name   "Error"
+            :text   (-> data :response :message)
+            :code   (-> data :status)
+            :detail (-> data :response)}))
 
-(defn attach-success! [new-attachment]
-  (swap! app-state update-in [:attachments] conj new-attachment))
+(defn set-value
+  [field-cursor value]
+  (swap! app-db update-in (om/path field-cursor) assoc :value value))
 
-(defn delete-attachment!
-  "Quick and dirty delete function"
-  [attachments-ref {:keys [delete_url] :as attachment}]
-  (if (js/confirm "Are you sure you want to delete this file?")
-    (let []
-      (DELETE delete_url {:handler         (fn [{:keys [message document] :as data}]
-                                             (let [pred #(= % attachment)]
-                                               (om/transact! attachments-ref #(vec (remove pred %)))))
-                          :error-handler   (fn [{:keys [status failure response status-text] :as data}]
-                                             (js/alert "Unable to delete file"))
-                          :headers         {"X-CSRFToken" (.get (goog.net.Cookies. js/document) "csrftoken")}
-                          :format          :json
-                          :response-format :json
-                          :keywords?       true}))))
+(defn set-geographic-element
+  [many-field values]
+  (let [new-fields (for [value values]
+                     (-> (new-value-field many-field)
+                         (update-in [:value :northBoundLatitude] merge (:northBoundLatitude value))
+                         (update-in [:value :southBoundLatitude] merge (:southBoundLatitude value))
+                         (update-in [:value :eastBoundLongitude] merge (:eastBoundLongitude value))
+                         (update-in [:value :westBoundLongitude] merge (:westBoundLongitude value))))]
+    (update! many-field :value (vec new-fields))))
 
-(defn field-blur! [cursor]
-  (om/update! cursor :show-errors true))
+(defn field-update [field v]
+  (set-value field v))
 
-(defn field-update! [owner field v]
-  (om/update! field :value v)
-  (put! (:pub-chan (om/get-shared owner)) {:topic (om/path field) :value v}))
+(defn value-changed [field value]
+  (swap! app-db update-in (om/path field)
+         assoc :value value :show-errors true))
 
-(defn value-change! [owner field event]
-  (field-update! owner field (-> event .-target .-value)))
+(defn checkbox-change [field event]
+  (field-update field (-> event .-target .-checked)))
 
-(defn hide-errors! [form]
-  (om/update! form :show-errors false))
+(defn set-tab
+  [page id]
+  (update! page [:tab] id))
 
-(defn show-errors! [form-or-field]
-  (om/update! form-or-field :show-errors true))
+(defn load-errors
+  [form-ref data]
+  (update! form-ref logic/load-errors data))
 
-(defn hide-create-modal! []
-  (om/update! (ref-path [:page]) :show-create-modal false))
-
-(defn show-create-modal! []
-  (om/update! (ref-path [:page]) :show-create-modal true))
-
-(defn tab-click! [page id]
-  (om/update! page [:tab] id))
-
-(defn status-filter! [page x]
-  (om/update! page :status-filter x))
-
-(defn update-address! [contact {:keys [city organisationName deliveryPoint deliveryPoint2
-                                       postalCode country administrativeArea]}]
-  (om/transact! contact
-                #(-> %
-                     (assoc-in [:value :organisationName :value] organisationName)
-                     (update-in [:value :address :deliveryPoint :value] reverse-or deliveryPoint)
-                     (update-in [:value :address :deliveryPoint2 :value] reverse-or deliveryPoint2)
-                     (update-in [:value :address :city :value] reverse-or city)
-                     (update-in [:value :address :administrativeArea :value] reverse-or administrativeArea)
-                     (update-in [:value :address :postalCode :value] reverse-or postalCode)
-                     (update-in [:value :address :country :value] reverse-or country))))
-
-(defn add-extent! [geographicElements extent]
-  (om/transact! geographicElements #(conj % {:value (logic/extent->geographicElement extent)})))
-
-(defn update-extent! [geographicElements i [_ extent]]
-  (om/update! geographicElements [i :value] (logic/extent->geographicElement extent)))
-
-(defn del-element! [geographicElements element]
-  (om/transact! geographicElements #(vec (remove (partial = {:value element}) %))))
-
-(defn add-keyword! [keywords value]
+(defn add-keyword-extra [keywords value]
   (when-not (empty? value)
-    (om/update! keywords (vec (conj keywords {:value value})))))
+    (swap! app-db assoc-in (om/path keywords) (vec (conj keywords {:value value})))))
 
-(defn del-keyword! [keywords value]
-  (om/update! keywords (vec (remove #(= value (:value %)) keywords))))
-
+(defn del-keyword-extra [keywords value]
+  (swap! app-db assoc-in (om/path keywords) (vec (remove #(= value (:value %)) keywords))))
