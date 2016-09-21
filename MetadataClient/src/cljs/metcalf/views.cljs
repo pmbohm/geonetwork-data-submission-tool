@@ -1285,7 +1285,7 @@
     om/IRenderState
     (render-state [_ {:keys [saving]}]
       (let [{:keys [document urls site]} (observe-path owner [:context])
-            {:keys [portal_title portal_url]} site
+            {:keys [portal_title portal_url email]} site
             {:keys [errors]} (observe-path owner [:progress])
             {:keys [disabled dirty]} (observe-path owner [:form])
             noteForDataManager (observe-path owner [:form :fields :noteForDataManager])
@@ -1295,6 +1295,7 @@
             submitted? (= (:status document) "Submitted")]
         (html [:div.Lodge
                [:p "Are you finished? Use this page to lodge your completed metadata record."]
+               [:p "Any difficulties?  Please contact " [:a {:href (str "mailto:" email)} email]]
                [:p "The Data Manager will be notified of your submission and will be in contact
                if any further information is required. Once approved, your data will be archived
                for discovery in the "
