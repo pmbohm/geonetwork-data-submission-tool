@@ -56,8 +56,8 @@
 ;; BoxMapWidget
 
 (defn init-map-props []
-  {:map-options {:zoom             6
-                 :center           (js/google.maps.LatLng. -42 147)
+  {:map-options {:zoom             4
+                 :center           (js/google.maps.LatLng. -28 133.9)
                  :rectangleOptions #js {:clickable true,
                                         :draggable false,
                                         :editable  false,
@@ -239,7 +239,10 @@
 
     om/IRender
     (render [_]
-      (html
+            (when-let [map (om/get-state owner :map)]
+                 (js/console.log {:zoom   (.getZoom map)
+                                  :center (.toString (.getCenter map))}))
+            (html
         [:div
          (when-not disabled
            [:div {:ref   "map-area-controls"
