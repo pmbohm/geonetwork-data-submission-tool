@@ -194,8 +194,13 @@ class Command(BaseCommand):
                                                                vocabName='aodn-organisation-vocabulary',
                                                                query=_query)
 
-        response = requests.get(url, stream=True, headers={'Accept': 'text/csv'})
-        reader = csv.DictReader(response.raw, skipinitialspace=True)
+        # We used to stream the response, but they've turned on gzip
+        # it seems, and apparently `requests' doesn't automatically
+        # decode gzip in that case.  To keep it simple (and in case
+        # there's further changes), we'll just work with the text
+        # (it's not that large)
+        response = requests.get(url, headers={'Accept': 'text/csv'})
+        reader = csv.DictReader(response.text.splitlines(), skipinitialspace=True)
         for row in reader:
             yield Institution(
                 uri=row['uri'],
