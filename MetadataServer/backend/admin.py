@@ -47,6 +47,8 @@ def bulk_scheduled(modeladmin, request, queryset):
     for datafeed in queryset.filter(state=models.DataFeed.IDLE):
         datafeed.schedule()
         datafeed.save()
+
+
 bulk_scheduled.short_description = "Schedule refresh"
 
 
@@ -54,6 +56,8 @@ def bulk_unscheduled(modeladmin, request, queryset):
     for datafeed in queryset.filter(state=models.DataFeed.SCHEDULED):
         datafeed.unschedule()
         datafeed.save()
+
+
 bulk_unscheduled.short_description = "Unschedule refresh"
 
 
@@ -68,7 +72,7 @@ class DataFeedAdmin(FSMTransitionMixin, admin.ModelAdmin):
     actions = [bulk_scheduled, bulk_unscheduled]
 
     def feed_quality(self, obj):
-        if obj.last_success and obj.last_refresh==obj.last_success:
+        if obj.last_success and obj.last_refresh == obj.last_success:
             return format_html("<b>{0}</b> - {1}", "Good", "Most recent refresh succeeded")
         elif obj.last_success and obj.last_refresh > obj.last_success:
             return format_html("<b>{0}</b> - {1}", "Stale", "We have data but the most recent refresh failed")
@@ -129,7 +133,8 @@ class CommonVocabNodeAdmin(admin.ModelAdmin):
     readonly_fields = ['URI', 'Name', 'Definition', 'Version', 'ancestors', 'children', 'is_selectable']
 
     def ancestors(self, inst):
-        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>", [(node.pk, node.Name,) for node in inst.get_ancestors()])
+        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>",
+                                [(node.pk, node.Name,) for node in inst.get_ancestors()])
         return format_html("<ul>{}</ul>", list)
 
     def children(self, inst):
@@ -138,7 +143,8 @@ class CommonVocabNodeAdmin(admin.ModelAdmin):
         if inst.tree_id is None:
             return None;
 
-        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>", [(node.pk, node.Name,) for node in inst.get_children()])
+        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>",
+                                [(node.pk, node.Name,) for node in inst.get_children()])
         return format_html("<ul>{}</ul>", list)
 
 
