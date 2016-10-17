@@ -200,7 +200,7 @@ class Command(BaseCommand):
         # there's further changes), we'll just work with the text
         # (it's not that large)
         response = requests.get(url, headers={'Accept': 'text/csv'})
-        reader = csv.DictReader(response.text.splitlines(), skipinitialspace=True)
+        reader = csv.DictReader(response.text.encode('utf8').splitlines(), skipinitialspace=True)
         for row in reader:
             yield Institution(
                 uri=row['uri'],
