@@ -72,14 +72,17 @@ class DataFeedAdmin(FSMTransitionMixin, admin.ModelAdmin):
     actions = [bulk_scheduled, bulk_unscheduled]
 
     def feed_quality(self, obj):
-        if obj.last_success and obj.last_refresh == obj.last_success:
+        q = obj.feed_quality()
+        if q is "Good":
             return format_html("<b>{0}</b> - {1}", "Good", "Most recent refresh succeeded")
-        elif obj.last_success and obj.last_refresh > obj.last_success:
+        elif q is "Stale":
             return format_html("<b>{0}</b> - {1}", "Stale", "We have data but the most recent refresh failed")
-        elif not obj.last_success and obj.last_refresh:
+        elif q is "Bad":
             return format_html("<b>{0}</b> - {1}", "Bad", "We have not successfully refreshed data")
-        else:
+        elif q is "Uninitialised":
             return format_html("<b>{0}</b> - {1}", "No data", "No refresh has been attempted")
+        else:
+            return format_html("<b>{0}</b>", q)
 
     feed_quality.short_description = "Feed quality"
 

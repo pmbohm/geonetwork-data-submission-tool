@@ -72,6 +72,18 @@ class DataFeed(models.Model):
             ("datafeed_admin", "Can administer datafeed"),
         )
 
+    def feed_quality(self):
+        if not self.last_refresh:
+            return "Uninitialised"
+        elif not self.last_success:
+            return "Bad"
+        elif not self.last_failure:
+            return "Good"
+        elif self.last_success > self.last_failure:
+            return "Good"
+        else:
+            return "Stale"
+
     @transition(field=state, source=[IDLE], target=SCHEDULED, permission='backend.datafeed_schedule')
     def schedule(self):
         pass
