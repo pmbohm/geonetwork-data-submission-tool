@@ -128,7 +128,7 @@ class BaseParameterVocabLoader(object):
                                                                query=_query)
 
         response = requests.get(url, headers={'Accept': 'text/csv'})
-        reader = csv.DictReader(response.text.splitlines, skipinitialspace=True)
+        reader = csv.DictReader(response.text.encode('utf-8').splitlines(), skipinitialspace=True)
         for row in reader:
             parent = row['parent'] or row['extParent']
             yield row['uri'], parent, {
