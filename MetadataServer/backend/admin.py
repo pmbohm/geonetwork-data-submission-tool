@@ -7,7 +7,8 @@ from backend import models
 
 
 class InstitutionAdmin(admin.ModelAdmin):
-    list_display = ['prefLabel', 'organisationName', 'deliveryPoint', 'city', 'administrativeArea', 'postalCode', 'country']
+    list_display = ['prefLabel', 'organisationName', 'deliveryPoint', 'city', 'administrativeArea', 'postalCode',
+                    'country']
     search_fields = ['prefLabel', 'altLabel', 'uri',
                      'organisationName', 'deliveryPoint', 'deliveryPoint2', 'city', 'administrativeArea', 'postalCode',
                      'country']
@@ -57,7 +58,7 @@ bulk_unscheduled.short_description = "Unschedule refresh"
 
 
 class DataFeedAdmin(FSMTransitionMixin, admin.ModelAdmin):
-    list_display = ["name", "state", "last_refresh", "last_success"]
+    list_display = ["name", "state", "last_refresh", "last_success", "feed_quality"]
     readonly_fields = ["state",
                        "last_refresh",
                        "last_success",
@@ -65,6 +66,18 @@ class DataFeedAdmin(FSMTransitionMixin, admin.ModelAdmin):
                        "last_duration",
                        "last_output"]
     actions = [bulk_scheduled, bulk_unscheduled]
+
+    def feed_quality(self, obj):
+        if obj.last_success and obj.last_refresh==obj.last_success:
+            return format_html("<b>{0}</b> - {1}", "Good", "Most recent refresh succeeded")
+        elif obj.last_success and obj.last_refresh > obj.last_success:
+            return format_html("<b>{0}</b> - {1}", "Stale", "We have data but the most recent refresh failed")
+        elif not obj.last_success and obj.last_refresh:
+            return format_html("<b>{0}</b> - {1}", "Bad", "We have not successfully refreshed data")
+        else:
+            return format_html("<b>{0}</b> - {1}", "No data", "No refresh has been attempted")
+
+    feed_quality.short_description = "Feed quality"
 
 
 class DocumentAdmin(FSMTransitionMixin, admin.ModelAdmin):
