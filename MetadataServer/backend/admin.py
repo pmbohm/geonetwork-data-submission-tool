@@ -7,7 +7,8 @@ from backend import models
 
 
 class InstitutionAdmin(admin.ModelAdmin):
-    list_display = ['prefLabel', 'organisationName', 'deliveryPoint', 'city', 'administrativeArea', 'postalCode', 'country']
+    list_display = ['prefLabel', 'organisationName', 'deliveryPoint', 'city', 'administrativeArea', 'postalCode',
+                    'country']
     search_fields = ['prefLabel', 'altLabel', 'uri',
                      'organisationName', 'deliveryPoint', 'deliveryPoint2', 'city', 'administrativeArea', 'postalCode',
                      'country']
@@ -46,6 +47,8 @@ def bulk_scheduled(modeladmin, request, queryset):
     for datafeed in queryset.filter(state=models.DataFeed.IDLE):
         datafeed.schedule()
         datafeed.save()
+
+
 bulk_scheduled.short_description = "Schedule refresh"
 
 
@@ -53,11 +56,13 @@ def bulk_unscheduled(modeladmin, request, queryset):
     for datafeed in queryset.filter(state=models.DataFeed.SCHEDULED):
         datafeed.unschedule()
         datafeed.save()
+
+
 bulk_unscheduled.short_description = "Unschedule refresh"
 
 
 class DataFeedAdmin(FSMTransitionMixin, admin.ModelAdmin):
-    list_display = ["name", "state", "last_refresh", "last_success"]
+    list_display = ["name", "state", "last_refresh", "last_success", "feed_quality"]
     readonly_fields = ["state",
                        "last_refresh",
                        "last_success",
@@ -65,6 +70,18 @@ class DataFeedAdmin(FSMTransitionMixin, admin.ModelAdmin):
                        "last_duration",
                        "last_output"]
     actions = [bulk_scheduled, bulk_unscheduled]
+
+    def feed_quality(self, obj):
+        if obj.last_success and obj.last_refresh == obj.last_success:
+            return format_html("<b>{0}</b> - {1}", "Good", "Most recent refresh succeeded")
+        elif obj.last_success and obj.last_refresh > obj.last_success:
+            return format_html("<b>{0}</b> - {1}", "Stale", "We have data but the most recent refresh failed")
+        elif not obj.last_success and obj.last_refresh:
+            return format_html("<b>{0}</b> - {1}", "Bad", "We have not successfully refreshed data")
+        else:
+            return format_html("<b>{0}</b> - {1}", "No data", "No refresh has been attempted")
+
+    feed_quality.short_description = "Feed quality"
 
 
 class DocumentAdmin(FSMTransitionMixin, admin.ModelAdmin):
@@ -116,7 +133,8 @@ class CommonVocabNodeAdmin(admin.ModelAdmin):
     readonly_fields = ['URI', 'Name', 'Definition', 'Version', 'ancestors', 'children', 'is_selectable']
 
     def ancestors(self, inst):
-        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>", [(node.pk, node.Name,) for node in inst.get_ancestors()])
+        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>",
+                                [(node.pk, node.Name,) for node in inst.get_ancestors()])
         return format_html("<ul>{}</ul>", list)
 
     def children(self, inst):
@@ -125,7 +143,8 @@ class CommonVocabNodeAdmin(admin.ModelAdmin):
         if inst.tree_id is None:
             return None;
 
-        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>", [(node.pk, node.Name,) for node in inst.get_children()])
+        list = format_html_join("", "<li><a href='../{}/'>{}</a></li>",
+                                [(node.pk, node.Name,) for node in inst.get_children()])
         return format_html("<ul>{}</ul>", list)
 
 
