@@ -36,7 +36,7 @@ def email_user_submit_confirmation(doc):
         'document': doc,
         'site': site
     }
-    send_mail(subject="Metadata submission confirmed: {0}".format(doc.title),
+    send_mail(subject=u"Metadata submission confirmed: {0}".format(doc.title),
               message=render_to_string('email_user_submit_confirmation.txt', context),
               from_email=site.sitecontent.email,
               recipient_list=[doc.owner.email],
