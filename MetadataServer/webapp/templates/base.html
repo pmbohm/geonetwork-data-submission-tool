@@ -2,6 +2,7 @@
 {% load bootstrap3 %}
 {% load staticfiles %}
 {% load gitrev %}
+{% load settings %}
 
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -26,7 +27,7 @@
     <script type="text/javascript" src="{% static 'polyfills/console-polyfill.js' %}"></script>
     <![endif]-->
 
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBQubjVlgI8dM9HflfvYBocoNTUVUgSpV0&libraries=drawing"
+    <script src="https://maps.googleapis.com/maps/api/js?key={% settings_value 'GMAPS_API_KEY' %}&libraries=drawing"
             async defer></script>
 
 
