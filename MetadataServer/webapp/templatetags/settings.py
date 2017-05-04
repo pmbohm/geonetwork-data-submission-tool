@@ -4,6 +4,6 @@ from django.conf import settings
 register = template.Library()
 
 # settings value
-@register.tag
+@register.simple_tag
 def settings_value(name):
     return getattr(settings, name, "")
