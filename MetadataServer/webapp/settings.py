@@ -38,6 +38,10 @@ DATABASES = {
     }
 }
 
+# All emails will be sent from this address; the Reply-To field is
+# used to indicate the intended / on-behalf-of sender:
+METCALF_FROM_EMAIL = ''
+
 LOGIN_URL = 'account_login'
 
 # Local time zone for this installation. Choices can be found here:
