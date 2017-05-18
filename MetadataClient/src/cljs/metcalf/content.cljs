@@ -127,7 +127,7 @@
                                                            :label    "Status of data"
                                                            :required true
                                                            :options  [["onGoing" "ongoing"]
-                                                                      ["complete" "complete"]]
+                                                                      ["completed" "completed"]]
                                                            :page     :data-identification}
                            :maintenanceAndUpdateFrequency {:type     nil
                                                            :label    "Maintenance and update frequency"

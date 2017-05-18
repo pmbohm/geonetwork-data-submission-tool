@@ -379,7 +379,7 @@
     (update-in state [:form :fields :identificationInfo :maintenanceAndUpdateFrequency] merge
                (match [status-value]
                       ["onGoing"] {:is-hidden false :disabled false :required true}
-                      ["complete"] {:is-hidden false :disabled true :value "none-planned" :required false}
+                      ["completed"] {:is-hidden false :disabled true :value "none-planned" :required false}
                       :else {:is-hidden true :disabled true :value "" :required false}))))
 
 (defn license-logic
