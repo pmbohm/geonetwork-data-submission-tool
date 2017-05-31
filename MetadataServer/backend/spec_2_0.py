@@ -39,6 +39,27 @@ DP_TERM_NODES = {
     }
 }
 
+
+def is_empty(node):
+    return not ''.join(node.itertext()).strip()
+
+
+def prune_if_empty(data, parent, spec, nsmap, i, silent):
+    """
+    Catch-all processing to clean up specific nodes that may have been
+    left with no content.
+
+    """
+    for xpath in ['gmd:descriptiveKeywords',
+                  'mcp:parameterName',
+                  'gmd:distributionFormat',
+                  'gmd:resourceConstraints',
+    ]:
+        for elem in parent.findall('.//' + xpath, nsmap):
+            if is_empty(elem):
+                elem.getparent().remove(elem)
+
+
 def new_term_vocab_prune(data, parent, spec, nsmap, i, silent):
     """
     In case of a new term we need to prune some XML chunks from the template.
@@ -249,6 +270,7 @@ def make_spec(**kwargs):
             'geonet': 'http://www.fao.org/geonetwork',
         },
         'xpath': '/mcp:MD_Metadata',
+        'postprocess': prune_if_empty,
         'nodes': {
             # Fake node so we can pass some additional metadata as payload
             'noteForDataManager': {
