@@ -40,8 +40,12 @@ DP_TERM_NODES = {
 }
 
 
+def all_text(node):
+    return ''.join(node.itertext()).strip()
+
+
 def is_empty(node):
-    return not ''.join(node.itertext()).strip()
+    return not all_text(node)
 
 
 def prune_if_empty(data, parent, spec, nsmap, i, silent):
