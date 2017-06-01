@@ -54,10 +54,23 @@ def prune_if_empty(data, parent, spec, nsmap, i, silent):
     left with no content.
 
     """
+    # Custom definitions of "empty" first:
+    for elem in parent.findall('.//mcp:parameterName', nsmap):
+        if all_text(elem) == 'shortName':
+            elem.getparent().remove(elem)
+    # descriptiveKeywords without any content; ie not empty, but don't have a gmd:keyword
+    for elem in parent.findall('.//gmd:descriptiveKeywords', nsmap):
+        if elem.find('./gmd:MD_Keywords/gmd:keyword', nsmap) is None:
+            elem.getparent().remove(elem)
+    for elem in parent.findall('.//mcp:parameterDeterminationInstrument', nsmap):
+        if elem.find('./mcp:DP_Term/mcp:term', nsmap) is None:
+            elem.getparent().remove(elem)
+    # No descendent text() at all:
     for xpath in ['gmd:descriptiveKeywords',
                   'mcp:parameterName',
                   'gmd:distributionFormat',
                   'gmd:resourceConstraints',
+                  'gmd:resourceMaintenance',
     ]:
         for elem in parent.findall('.//' + xpath, nsmap):
             if is_empty(elem):
