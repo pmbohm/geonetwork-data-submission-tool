@@ -23,11 +23,10 @@ def send_mail(subject=None, message=None, html_message=None, from_email=None, re
                                  body=message,
                                  from_email=metcalf_from,
                                  reply_to=[from_email],
-                                 to=recipient_list,
-                                 fail_silently=fail_silently)
+                                 to=recipient_list)
     if html_message:
         msg.attach_alternative(html_message, 'text/html')
-    msg.send()
+    msg.send(fail_silently=fail_silently)
 
 
 def email_manager_submit_alert(doc):
