@@ -62,6 +62,9 @@ def prune_if_empty(data, parent, spec, nsmap, i, silent):
     for elem in parent.findall('.//gmd:descriptiveKeywords', nsmap):
         if elem.find('./gmd:MD_Keywords/gmd:keyword', nsmap) is None:
             elem.getparent().remove(elem)
+    for elem in parent.findall('.//mcp:platform', nsmap):
+        if elem.find('./mcp:DP_Term/mcp:term', nsmap) is None:
+            elem.getparent().remove(elem)
     for elem in parent.findall('.//mcp:parameterDeterminationInstrument', nsmap):
         if elem.find('./mcp:DP_Term/mcp:term', nsmap) is None:
             elem.getparent().remove(elem)
