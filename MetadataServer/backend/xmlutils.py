@@ -203,7 +203,6 @@ def data_to_xml(data, parent, spec, nsmap, i=0, silent=True):
         else:
             if len(container) < 1:
                 msg = "container at xpath %s is not found" % xpath
-                print parent
                 if silent:
                     logger.warning(msg)
                     return
