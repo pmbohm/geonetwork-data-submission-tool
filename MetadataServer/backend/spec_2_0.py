@@ -546,7 +546,7 @@ def make_spec(**kwargs):
                     ],
                     'credit': [{'xpath': 'gmd:credit',
                                 'notes': 'Other credits',
-                                'keep': False}],
+                                'keep': True}],
                     'pointOfContact': [
                         {
                             'xpath': 'gmd:pointOfContact/gmd:CI_ResponsibleParty',
